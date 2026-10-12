@@ -81,32 +81,6 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
     });
   }
 
-  // PICK UNLOADING DATE
-  Future<void> _pickUnloadingDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null) {
-      setState(() {
-        _selectedUnloadingDate = picked;
-        _unloadingDateController.text = DateFormat('dd MMM yyyy').format(picked);
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _weightController.removeListener(_recalcShortage);
-    _weightController.dispose();
-    _reportingDateController.dispose();
-    _unloadingDateController.dispose();
-    super.dispose();
-  }
-
-  // PICK CHALLAN IMAGE
   Future<void> _pickChallanImage() async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -129,7 +103,6 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
     }
   }
 
-  // PICK CHALLAN FROM GALLERY
   Future<void> _pickChallanFromGallery() async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -152,7 +125,6 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
     }
   }
 
-  // PICK REPORTING DATE
   Future<void> _pickReportingDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -164,6 +136,27 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
       setState(() {
         _selectedReportingDate = picked;
         _reportingDateController.text = DateFormat('dd MMM yyyy').format(picked);
+      });
+    }
+  }
+
+  Future<void> _showDatePicker(
+    BuildContext context,
+    TextEditingController controller,
+    String dateType,
+  ) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        if (dateType == 'unloadingDate') {
+          _selectedUnloadingDate = picked;
+          controller.text = DateFormat('dd MMM yyyy').format(picked);
+        }
       });
     }
   }
@@ -191,15 +184,34 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
 
     setState(() => _isSubmitting = true);
 
+    // Check if this driver still owns this ticket (after potential reassignment)
+    final user = ref.read(authStateProvider).value;
+    if (user == null) return;
+
+    final ticketRepo = ref.read(ticketRepositoryProvider);
+    final ticket = await ticketRepo.getTicketById(widget.ticketId);
+    
+    // Verify driver still owns this ticket
+    if (ticket.driverUserId != user.userId) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('This trip has been reassigned to another driver. You can no longer submit details.'),
+            backgroundColor: AppColors.warningYellow,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        context.pop(false);
+      }
+      return;
+    }
+
+    final loadingRepo = LoadingUnloadingRepository();
+    final loading = await loadingRepo.getLoadingStatus(widget.ticketId);
+
+    if (loading == null) throw Exception('Loading status not found');
+
     try {
-      final user = ref.read(authStateProvider).value!;
-      final ticketRepo = ref.read(ticketRepositoryProvider);
-      final ticket = await ticketRepo.getTicketById(widget.ticketId);
-      final loadingRepo = LoadingUnloadingRepository();
-      final loading = await loadingRepo.getLoadingStatus(widget.ticketId);
-
-      if (loading == null) throw Exception('Loading status not found');
-
       final now = DateTime.now().toUtc();
       final unloadingWeight = double.parse(_weightController.text.trim());
 
@@ -271,9 +283,10 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
       if (!mounted) return;
       context.go('/driver/dashboard');
 
+      // Notify ALL admins (supports multiple admin accounts)
       final notifRepo = NotificationRepository();
-      final adminId = await notifRepo.getAdminUserId(user.companyCode);
-      if (adminId != null) {
+      final adminIds = await notifRepo.getAdminUserIds(user.companyCode);
+      for (final adminId in adminIds) {
         await notifRepo.sendNotification(
           targetUserId: adminId,
           title: 'Trip Completed',
@@ -307,6 +320,15 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _weightController.removeListener(_recalcShortage);
+    _weightController.dispose();
+    _reportingDateController.dispose();
+    _unloadingDateController.dispose();
+    super.dispose();
   }
 
   @override
@@ -418,7 +440,7 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
                     TextFormField(
                       controller: _unloadingDateController,
                       readOnly: true,
-                      onTap: _pickUnloadingDate,
+                      onTap: () => _showDatePicker(context, _unloadingDateController, ' unloadingDate'),
                       style: const TextStyle(fontSize: 14),
                       decoration: InputDecoration(
                         hintText: currentLocale.languageCode == 'hi' ? 'तिथि चुनें' : 'Select Unloading Date',

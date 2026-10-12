@@ -222,7 +222,13 @@ class PdfGenerator {
                   try {
                     final assignedAt = t['assignedAt'] as String? ?? '';
                     if (assignedAt.isNotEmpty) {
-                      assignedStr = DateFormat('dd-MM-yyyy').format(DateTime.parse(assignedAt));
+                      final assignedDate = DateTime.tryParse(assignedAt);
+                      if (assignedDate != null) {
+                        final istDate = assignedDate.toUtc().add(const Duration(hours: 5, minutes: 30));
+                        assignedStr = DateFormat('dd MMM yyyy').format(istDate);
+                      } else {
+                        assignedStr = assignedAt;
+                      }
                     }
                   } catch (_) {
                     assignedStr = t['assignedAt'] as String? ?? '';
@@ -230,7 +236,13 @@ class PdfGenerator {
                   try {
                     final completedAt = t['completedAt'] as String? ?? '';
                     if (completedAt.isNotEmpty) {
-                      completedStr = DateFormat('dd-MM-yyyy').format(DateTime.parse(completedAt));
+                      final completedDate = DateTime.tryParse(completedAt);
+                      if (completedDate != null) {
+                        final istDate = completedDate.toUtc().add(const Duration(hours: 5, minutes: 30));
+                        completedStr = DateFormat('dd MMM yyyy').format(istDate);
+                      } else {
+                        completedStr = completedAt;
+                      }
                     }
                   } catch (_) {
                     completedStr = t['completedAt'] as String? ?? 'N/A';
@@ -283,8 +295,8 @@ class PdfGenerator {
                   ['Vehicle', vehicleNumber],
                   ['Driver', trip['driverName'] as String? ?? trip['driverUserId'] as String? ?? ''],
                   ['Assigned By', trip['createdBy'] as String? ?? ''],
-                  ['Assigned At', trip['assignedAt'] as String? ?? ''],
-                  ['Completed At', trip['completedAt'] as String? ?? 'N/A'],
+                  ['Assigned At', _formatDbDate(trip['assignedAt'])],
+                  ['Completed At', _formatDbDate(trip['completedAt'])],
                 ], font, boldFont),
                 pw.SizedBox(height: 14),
 
@@ -374,6 +386,18 @@ class PdfGenerator {
     );
 
     return pdf.save();
+  }
+
+  /// Format date from DB (ISO string) to IST display format
+  static String _formatDbDate(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return 'N/A';
+    try {
+      final date = DateTime.parse(dateStr);
+      final istDate = date.toUtc().add(const Duration(hours: 5, minutes: 30));
+      return DateFormat('dd MMM yyyy').format(istDate);
+    } catch (_) {
+      return dateStr;
+    }
   }
 
   static pw.Widget _buildSectionHeader(String title, pw.Font font) {

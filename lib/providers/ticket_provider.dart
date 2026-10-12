@@ -38,6 +38,11 @@ class TicketState extends _$TicketState {
     });
   }
 
+  /// Get current driver's tickets for real-time validation
+  Future<List<TicketModel>> getDriverTicketsForValidation(String driverUserId) async {
+    return ref.read(ticketRepositoryProvider).getDriverTickets(driverUserId);
+  }
+
   Future<void> createTicket({
     required String ticketId,
     required String vehicleId,
@@ -54,6 +59,7 @@ class TicketState extends _$TicketState {
             driverUserId: driverUserId,
             companyCode: user.companyCode,
             createdBy: user.fullName,
+            createdByUserId: user.userId,
           );
       await refresh();
     } catch (e, stack) {
@@ -90,7 +96,14 @@ class TicketState extends _$TicketState {
             reason: reason,
             reassignedAtStage: reassignedAtStage,
           );
+      
+      // Immediately refresh to update UI for all users
       await refresh();
+      
+      // Also refresh the driver tickets provider for the affected drivers
+      ref.invalidate(allActiveTicketsProvider);
+      ref.invalidate(driverTicketsProvider);
+      
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
@@ -146,4 +159,14 @@ Future<List<TicketModel>> allActiveTickets(AllActiveTicketsRef ref) async {
   final user = ref.watch(authStateProvider).value;
   if (user == null) return [];
   return ref.watch(ticketRepositoryProvider).getAllActiveTickets(user.companyCode);
+}
+
+@riverpod
+Future<List<TicketModel>> driverTickets(DriverTicketsRef ref) async {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return [];
+  final tickets = await ref.watch(ticketRepositoryProvider).getDriverTickets(user.userId);
+  
+  // Filter out tickets that are no longer assigned to this driver (after reassignment)
+  return tickets.where((t) => t.driverUserId == user.userId).toList();
 }

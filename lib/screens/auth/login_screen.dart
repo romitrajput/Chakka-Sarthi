@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/app_colors.dart';
+import 'package:sanjay_roadlines_fleet/core/constants/app_strings.dart';
 import 'package:sanjay_roadlines_fleet/providers/auth_provider.dart';
+import 'package:sanjay_roadlines_fleet/models/user_model.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -19,6 +21,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isMpinMode = false;
   bool _rememberMe = false;
   bool _obscurePassword = true;
+  bool _isLoggingIn = false;
+  bool _isRedirecting = false;
 
   @override
   void initState() {
@@ -52,6 +56,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final userId = _userIdController.text.trim();
     final secret = _passwordController.text.trim();
 
+    setState(() => _isLoggingIn = true);
+
     if (_isMpinMode) {
       await ref.read(authStateProvider.notifier).loginWithMpin(
             userId,
@@ -65,6 +71,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             remember: _rememberMe,
           );
     }
+
+    setState(() => _isLoggingIn = false);
 
     if (!mounted) return;
 
@@ -83,13 +91,212 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final user = authState.value;
     if (user == null) return;
 
-    if (user.isFirstLogin) {
-      context.go('/set-mpin', extra: user);
-    } else if (user.role == 'admin') {
-      context.go('/admin/dashboard');
-    } else {
-      context.go('/driver/dashboard');
+    // Show user info screen before redirecting
+    if (mounted) {
+      await _showUserInfoAndRedirect(user);
     }
+  }
+
+  /// Show user details with nice UI and then redirect to appropriate dashboard
+  Future<void> _showUserInfoAndRedirect(UserModel user) async {
+    if (!mounted) return;
+
+    final isAdmin = user.role == 'admin';
+    final destination = user.isFirstLogin ? '/set-mpin' : (isAdmin ? '/admin/dashboard' : '/driver/dashboard');
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => GestureDetector(
+        onTap: () {},
+        child: Container(
+          color: Colors.black54,
+          child: Center(
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.85,
+              constraints: const BoxConstraints(maxWidth: 400),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Success icon
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: AppColors.successGreen.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_circle,
+                      color: AppColors.successGreen,
+                      size: 40,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Welcome message
+                  Text(
+                    isAdmin ? 'Welcome Admin!' : 'Welcome Driver!',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'You have successfully logged in',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // User info card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+                        // Role badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isAdmin
+                                ? AppColors.primaryDark.withValues(alpha: 0.1)
+                                : AppColors.accentOrange.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            isAdmin ? 'ADMIN' : 'DRIVER',
+                            style: TextStyle(
+                              color: isAdmin ? AppColors.primaryDark : AppColors.accentOrange,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // User ID row
+                        _buildUserInfoRow(
+                          Icons.person_outline,
+                          'Login ID',
+                          user.userId,
+                        ),
+                        const Divider(height: 24, indent: 0),
+
+                        // Full name row
+                        _buildUserInfoRow(
+                          Icons.business_outlined,
+                          'Name',
+                          user.fullName,
+                        ),
+                        const Divider(height: 24, indent: 0),
+
+                        // Mobile row
+                        _buildUserInfoRow(
+                          Icons.phone_outlined,
+                          'Mobile',
+                          user.mobile,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Loading indicator or Continue button
+                  if (_isRedirecting)
+                    const CircularProgressIndicator()
+                  else
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () => _redirectToDashboard(destination, user),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryDark,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Continue',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primaryMid, size: 20),
+        const SizedBox(width: 12),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const Spacer(),
+        Flexible(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _redirectToDashboard(String destination, UserModel user) async {
+    if (!mounted) return;
+
+    setState(() => _isRedirecting = true);
+
+    // Small delay for better UX
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    if (!mounted) return;
+
+    Navigator.of(context).pop(); // Close dialog
+    context.go(destination);
   }
 
   @override
@@ -291,7 +498,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           height: screenH * 0.058,
                           child: ElevatedButton(
                             onPressed:
-                                authState.isLoading ? null : _handleLogin,
+                                (_isLoggingIn || authState.isLoading) ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primaryDark,
                               foregroundColor: Colors.white,
@@ -299,7 +506,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14)),
                             ),
-                            child: authState.isLoading
+                            child: (_isLoggingIn || authState.isLoading)
                                 ? const SizedBox(
                                     width: 22,
                                     height: 22,

@@ -10,6 +10,7 @@ class TicketModel {
   final DateTime assignedAt;
   final DateTime? completedAt;
   final String createdBy;
+  final String? createdByUserId; // Admin user ID who created this ticket
   final String? pdfUrl;
   final DateTime createdAt;
   final DateTime? reportingDate;
@@ -28,6 +29,7 @@ class TicketModel {
     required this.assignedAt,
     this.completedAt,
     required this.createdBy,
+    this.createdByUserId,
     this.pdfUrl,
     required this.createdAt,
     this.reportingDate,
@@ -55,7 +57,7 @@ class TicketModel {
     int? reassignmentCount,
     int? detentionDays,
   }) {
-    return TicketModel(
+    return    TicketModel(
       id: id ?? this.id,
       ticketId: ticketId ?? this.ticketId,
       vehicleId: vehicleId ?? this.vehicleId,
@@ -65,6 +67,7 @@ class TicketModel {
       assignedAt: assignedAt ?? this.assignedAt,
       completedAt: completedAt ?? this.completedAt,
       createdBy: createdBy ?? this.createdBy,
+      createdByUserId: createdByUserId ?? this.createdByUserId,
       pdfUrl: pdfUrl ?? this.pdfUrl,
       createdAt: createdAt ?? this.createdAt,
       reportingDate: reportingDate ?? this.reportingDate,
@@ -88,6 +91,7 @@ class TicketModel {
           ? DateTime.parse(json['completed_at'] as String)
           : null,
       createdBy: json['created_by'] as String,
+      createdByUserId: json['created_by_user_id'] as String?,
       pdfUrl: json['pdf_url'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       reportingDate: json['reporting_date'] != null
@@ -98,7 +102,7 @@ class TicketModel {
           : [],
       reassignedFrom: json['reassigned_from'] as String?,
       reassignmentCount: json['reassignment_count'] as int? ?? 0,
-      detentionDays: json['retention_days'] as int?,
+      detentionDays: json['retention_days'] as int?, // Days between unloading and reporting date
     );
   }
 
@@ -113,13 +117,14 @@ class TicketModel {
       'assigned_at': assignedAt.toIso8601String(),
       'completed_at': completedAt?.toIso8601String(),
       'created_by': createdBy,
+      if (createdByUserId != null) 'created_by_user_id': createdByUserId,
       'pdf_url': pdfUrl,
       'created_at': createdAt.toIso8601String(),
       'reporting_date': reportingDate?.toIso8601String(),
       'challan_urls': challanUrls,
       'reassigned_from': reassignedFrom,
       'reassignment_count': reassignmentCount,
-      'retention_days': detentionDays,
+      'retention_days': detentionDays, // Days between unloading and reporting date
     };
   }
 
@@ -141,8 +146,8 @@ class TicketModel {
   }
 
   int get calculatedDetentionDays {
-    if (completedAt == null || reportingDate == null) return 0;
-    return reportingDate!.difference(completedAt!).inDays;
+    // Detention days = Reporting date - Unloading date (calculated when saved)
+    return detentionDays ?? 0;
   }
 
   /// Returns the current stage of the trip for reassignment logging

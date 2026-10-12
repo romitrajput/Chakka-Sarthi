@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/app_colors.dart';
 import 'package:sanjay_roadlines_fleet/models/loading_status_model.dart';
+import 'package:sanjay_roadlines_fleet/models/ticket_model.dart';
 import 'package:sanjay_roadlines_fleet/providers/auth_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/ticket_provider.dart';
 import 'package:sanjay_roadlines_fleet/repositories/loading_unloading_repository.dart';
@@ -65,10 +66,28 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_isFetching) return;
 
+    // Check if this driver still owns this ticket (after potential reassignment)
+    final user = ref.read(authStateProvider).value;
+    if (user == null) return;
+
+    final currentTicket = await ref.read(ticketRepositoryProvider).getTicketById(widget.ticketId);
+    if (currentTicket.driverUserId != user.userId) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('This trip has been reassigned to another driver. You can no longer submit details.'),
+            backgroundColor: AppColors.warningYellow,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        context.pop(false);
+      }
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
-      final user = ref.read(authStateProvider).value!;
       final now = DateTime.now().toUtc();
 
       final model = LoadingStatusModel(
@@ -90,9 +109,10 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
       // Show pop-up notification
       LocalNotificationService.notifyLoadingCompleted(user.fullName, widget.ticketId);
 
+      // Notify ALL admins (supports multiple admin accounts)
       final notifRepo = NotificationRepository();
-      final adminId = await notifRepo.getAdminUserId(user.companyCode);
-      if (adminId != null) {
+      final adminIds = await notifRepo.getAdminUserIds(user.companyCode);
+      for (final adminId in adminIds) {
         await notifRepo.sendNotification(
           targetUserId: adminId,
           title: 'Trip Started',

@@ -59,19 +59,19 @@ class NotificationRepository {
     }
   }
 
-  Future<String?> getAdminUserId(String companyCode) async {
+  /// Get ALL admin user IDs for a company (supports multiple admins)
+  Future<List<String>> getAdminUserIds(String companyCode) async {
     try {
       final response = await _client
           .from(SupabaseConstants.tableUsers)
           .select('user_id')
           .eq('company_code', companyCode)
           .eq('role', 'admin')
-          .limit(1)
-          .maybeSingle();
+          .eq('is_active', true);
       
-      return response?['user_id'] as String?;
+      return (response as List).map((u) => u['user_id'] as String).toList();
     } catch (e) {
-      rethrow;
+      return [];
     }
   }
 }

@@ -6,7 +6,7 @@ class TicketRepository {
   final SupabaseClient _client = Supabase.instance.client;
 
   static const _cols =
-      'id, ticket_id, vehicle_id, driver_user_id, company_code, status, assigned_at, completed_at, created_by, pdf_url, created_at, reporting_date, challan_urls, reassigned_from, reassignment_count, retention_days';
+      'id, ticket_id, vehicle_id, driver_user_id, company_code, status, assigned_at, completed_at, created_by, created_by_user_id, pdf_url, created_at, reporting_date, challan_urls, reassigned_from, reassignment_count, retention_days';
 
   Future<void> createTicket({
     required String ticketId,
@@ -14,6 +14,7 @@ class TicketRepository {
     required String driverUserId,
     required String companyCode,
     required String createdBy,
+    String? createdByUserId,
   }) async {
     try {
       final active = await _client
@@ -44,6 +45,7 @@ class TicketRepository {
         'status': 'assigned',
         'assigned_at': DateTime.now().toUtc().toIso8601String(),
         'created_by': createdBy,
+        if (createdByUserId != null) 'created_by_user_id': createdByUserId,
       });
 
       await _client
@@ -227,18 +229,29 @@ class TicketRepository {
     required DateTime reportingDate,
   }) async {
     try {
-      // Calculate detention days (reporting date - completed date)
+      // Calculate detention days (unloading date - reporting date)
       final ticket = await getTicketById(ticketId);
       int? detentionDays;
-      if (ticket.completedAt != null) {
-        detentionDays = reportingDate.difference(ticket.completedAt!).inDays;
+      
+      // Get unloading date from unloading_status table
+      final unloadingRes = await _client
+          .from(SupabaseConstants.tableUnloadingStatus)
+          .select('unloading_date')
+          .eq('ticket_id', ticketId)
+          .maybeSingle();
+      
+      if (unloadingRes != null && reportingDate != null) {
+        final unloadingDate = DateTime.parse(unloadingRes['unloading_date'] as String);
+        if (unloadingDate.isBefore(reportingDate)) {
+          detentionDays = reportingDate.difference(unloadingDate).inDays;
+        }
       }
 
       await _client
           .from(SupabaseConstants.tableTickets)
           .update({
             'reporting_date': reportingDate.toUtc().toIso8601String(),
-            if (detentionDays != null) 'retention_days': detentionDays,
+            if (detentionDays != null)      'retention_days': detentionDays, // Days between unloading and reporting
           })
           .eq('ticket_id', ticketId);
     } catch (e) {
