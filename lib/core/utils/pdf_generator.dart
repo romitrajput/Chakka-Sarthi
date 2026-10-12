@@ -1,0 +1,418 @@
+import 'dart:typed_data';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:intl/intl.dart';
+import 'package:sanjay_roadlines_fleet/models/ticket_model.dart';
+import 'package:sanjay_roadlines_fleet/models/loading_status_model.dart';
+import 'package:sanjay_roadlines_fleet/models/unloading_status_model.dart';
+
+class PdfGenerator {
+  static Future<Uint8List> generateTripPdf({
+    required TicketModel ticket,
+    required LoadingStatusModel loading,
+    required UnloadingStatusModel unloading,
+    required String companyName,
+  }) async {
+    final pdf = pw.Document();
+    final font = await PdfGoogleFonts.robotoRegular();
+    final boldFont = await PdfGoogleFonts.robotoBold();
+    final now = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+    final formattedNow = DateFormat('dd-MM-yyyy, hh:mm a').format(now);
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // HEADER BLOCK
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.all(12),
+                decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF1B4F72)),
+                child: pw.Column(
+                  children: [
+                    pw.Text(
+                      companyName.toUpperCase(),
+                      style: pw.TextStyle(font: boldFont, color: PdfColors.white, fontSize: 20),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      'TRIP COMPLETION REPORT',
+                      style: pw.TextStyle(font: font, color: PdfColors.white, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              pw.Divider(thickness: 1, color: PdfColors.grey),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Request ID: ${ticket.ticketId}', style: pw.TextStyle(font: font, fontSize: 10)),
+                  pw.Text('Generated: $formattedNow', style: pw.TextStyle(font: font, fontSize: 10)),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+
+              // SECTION A - Trip Details
+              _buildSectionHeader('TRIP DETAILS', boldFont),
+              _buildTable([
+                ['Ticket ID', ticket.ticketId],
+                ['Assigned Date', ticket.formattedAssignedAt],
+                ['Driver Name', loading.driverName],
+                ['Vehicle Number', loading.vehicleNumber],
+                ['Assigned By', ticket.createdBy],
+              ], font, boldFont),
+              pw.SizedBox(height: 20),
+
+              // SECTION B - Loading Details
+              _buildSectionHeader('LOADING DETAILS', boldFont),
+              _buildTable([
+                ['LR Number', loading.lrNumber],
+                ['Journey From', loading.journeyFrom],
+                ['Journey To', loading.journeyTo],
+                ['Consignee', loading.consigneeName],
+                ['Product', loading.product],
+                ['Loading Weight (Kgs)', '${loading.loadingWeightKgs.toStringAsFixed(2)} Kgs'],
+                ['Loading Date', DateFormat('dd-MM-yyyy').format(loading.creationDate)],
+              ], font, boldFont),
+              pw.SizedBox(height: 20),
+
+              // SECTION C - Unloading Details
+              _buildSectionHeader('UNLOADING DETAILS', boldFont),
+              _buildTable([
+                ['Unloading Weight (Kgs)', '${unloading.unloadingWeightKgs.toStringAsFixed(2)} Kgs'],
+                ['Unloading Date', DateFormat('dd-MM-yyyy').format(unloading.unloadingDate)],
+                ['Shortage (Kgs)', '${unloading.shortageKgs.toStringAsFixed(2)} Kgs'],
+              ], font, boldFont),
+              pw.SizedBox(height: 20),
+
+              // SECTION D - Reporting & Detention
+              if (ticket.reportingDate != null || ticket.detentionDays != null)
+                pw.Column(
+                  children: [
+                    _buildSectionHeader('REPORTING & DETENTION', boldFont),
+                    _buildTable([
+                      if (ticket.reportingDate != null)
+                        ['Reporting Date', DateFormat('dd-MM-yyyy').format(ticket.reportingDate!)],
+                      if (ticket.detentionDays != null)
+                        ['Detention Days', '${ticket.detentionDays} day(s)'],
+                    ], font, boldFont),
+                    pw.SizedBox(height: 20),
+                  ],
+                ),
+
+              pw.Spacer(),
+              // FOOTER
+              pw.Divider(thickness: 0.5, color: PdfColors.grey),
+              pw.Center(
+                child: pw.Text(
+                  'Generated by Sanjay Roadlines Fleet Management System',
+                  style: pw.TextStyle(font: font, fontSize: 9, color: PdfColors.grey),
+                ),
+              ),
+              pw.Center(
+                child: pw.Text(
+                  'This is a system-generated document.',
+                  style: pw.TextStyle(font: font, fontSize: 9, color: PdfColors.grey, fontStyle: pw.FontStyle.italic),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  // GENERATE CONSOLIDATED VEHICLE-WISE REPORT WITH FULL DETAILS
+  static Future<Uint8List> generateConsolidatedReport({
+    required String vehicleNumber,
+    required List<Map<String, dynamic>> tripDetails,
+    required String companyName,
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) async {
+    final pdf = pw.Document();
+    final font = await PdfGoogleFonts.robotoRegular();
+    final boldFont = await PdfGoogleFonts.robotoBold();
+    final now = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+    final formattedNow = DateFormat('dd-MM-yyyy, hh:mm a').format(now);
+
+    // Calculate totals
+    double totalLoading = 0;
+    double totalUnloading = 0;
+    double totalShortage = 0;
+    for (var trip in tripDetails) {
+      totalLoading += (trip['loadingKgs'] as double?) ?? 0;
+      totalUnloading += (trip['unloadingKgs'] as double?) ?? 0;
+      totalShortage += (trip['shortageKgs'] as double?) ?? 0;
+    }
+
+    // COVER PAGE
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.all(20),
+                decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF1B4F72)),
+                child: pw.Column(
+                  children: [
+                    pw.Text(
+                      companyName.toUpperCase(),
+                      style: pw.TextStyle(font: boldFont, color: PdfColors.white, fontSize: 24),
+                    ),
+                    pw.SizedBox(height: 8),
+                    pw.Text(
+                      'VEHICLE-WISE CONSOLIDATED REPORT',
+                      style: pw.TextStyle(font: font, color: PdfColors.white, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 30),
+              _buildSectionHeader('REPORT SUMMARY', boldFont),
+              _buildTable([
+                ['Vehicle Number', vehicleNumber],
+                ['Report Period', '${DateFormat('dd-MM-yyyy').format(fromDate)} to ${DateFormat('dd-MM-yyyy').format(toDate)}'],
+                ['Total Trips', '${tripDetails.length}'],
+                ['Total Loading (Kgs)', totalLoading.toStringAsFixed(2)],
+                ['Total Unloading (Kgs)', totalUnloading.toStringAsFixed(2)],
+                ['Total Shortage (Kgs)', totalShortage.toStringAsFixed(2)],
+                ['Total Detention Days', '${tripDetails.fold<int>(0, (sum, t) => sum + ((t['detentionDays'] as int?) ?? 0))} day(s)'],
+                ['Report Generated', formattedNow],
+              ], font, boldFont),
+            ],
+          );
+        },
+      ),
+    );
+
+    // TRIP SUMMARY TABLE PAGE
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('TRIP SUMMARY TABLE', boldFont),
+              pw.SizedBox(height: 10),
+              pw.TableHelper.fromTextArray(
+                headerStyle: pw.TextStyle(font: boldFont, fontSize: 9, color: PdfColors.white),
+                headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF2874A6)),
+                cellStyle: pw.TextStyle(font: font, fontSize: 8),
+                cellAlignment: pw.Alignment.centerLeft,
+                headerAlignment: pw.Alignment.centerLeft,
+                cellHeight: 24,
+                headers: ['#', 'Ticket ID', 'Assigned', 'Completed', 'Loading', 'Unloading', 'Shortage', 'Detention'],
+                data: tripDetails.asMap().entries.map((entry) {
+                  final i = entry.key + 1;
+                  final t = entry.value;
+                  String assignedStr = '';
+                  String completedStr = '';
+                  try {
+                    final assignedAt = t['assignedAt'] as String? ?? '';
+                    if (assignedAt.isNotEmpty) {
+                      assignedStr = DateFormat('dd-MM-yyyy').format(DateTime.parse(assignedAt));
+                    }
+                  } catch (_) {
+                    assignedStr = t['assignedAt'] as String? ?? '';
+                  }
+                  try {
+                    final completedAt = t['completedAt'] as String? ?? '';
+                    if (completedAt.isNotEmpty) {
+                      completedStr = DateFormat('dd-MM-yyyy').format(DateTime.parse(completedAt));
+                    }
+                  } catch (_) {
+                    completedStr = t['completedAt'] as String? ?? 'N/A';
+                  }
+                  return [
+                    '$i',
+                    (t['ticketId'] as String?) ?? '',
+                    assignedStr,
+                    completedStr,
+                    '${((t['loadingKgs'] as double?) ?? 0).toStringAsFixed(1)}',
+                    '${((t['unloadingKgs'] as double?) ?? 0).toStringAsFixed(1)}',
+                    '${((t['shortageKgs'] as double?) ?? 0).toStringAsFixed(1)}',
+                    '${t['detentionDays'] ?? 0}d',
+                  ];
+                }).toList(),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    // INDIVIDUAL TRIP DETAIL PAGES
+    for (var i = 0; i < tripDetails.length; i++) {
+      final trip = tripDetails[i];
+      
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // Trip header
+                pw.Container(
+                  width: double.infinity,
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF2874A6)),
+                  child: pw.Text(
+                    'TRIP ${i + 1}: ${trip['ticketId']}',
+                    style: pw.TextStyle(font: boldFont, color: PdfColors.white, fontSize: 14),
+                  ),
+                ),
+                pw.SizedBox(height: 16),
+
+                // Trip basic info
+                _buildSectionHeader('TRIP DETAILS', boldFont),
+                _buildTable([
+                  ['Ticket ID', trip['ticketId'] as String? ?? ''],
+                  ['Vehicle', vehicleNumber],
+                  ['Driver', trip['driverName'] as String? ?? trip['driverUserId'] as String? ?? ''],
+                  ['Assigned By', trip['createdBy'] as String? ?? ''],
+                  ['Assigned At', trip['assignedAt'] as String? ?? ''],
+                  ['Completed At', trip['completedAt'] as String? ?? 'N/A'],
+                ], font, boldFont),
+                pw.SizedBox(height: 14),
+
+                // Loading details
+                _buildSectionHeader('LOADING DETAILS', boldFont),
+                _buildTable([
+                  ['LR Number', trip['lrNumber'] as String? ?? 'N/A'],
+                  ['Journey From', trip['journeyFrom'] as String? ?? 'N/A'],
+                  ['Journey To', trip['journeyTo'] as String? ?? 'N/A'],
+                  ['Consignee', trip['consigneeName'] as String? ?? 'N/A'],
+                  ['Product', trip['product'] as String? ?? 'N/A'],
+                  ['Loading Weight (Kgs)', '${((trip['loadingKgs'] as double?) ?? 0).toStringAsFixed(2)} Kgs'],
+                  ['Loading Date', trip['loadingDate'] as String? ?? 'N/A'],
+                ], font, boldFont),
+                pw.SizedBox(height: 14),
+
+                // Unloading details
+                _buildSectionHeader('UNLOADING DETAILS', boldFont),
+                _buildTable([
+                  ['Unloading Weight (Kgs)', '${((trip['unloadingKgs'] as double?) ?? 0).toStringAsFixed(2)} Kgs'],
+                  ['Unloading Date', trip['unloadingDate'] as String? ?? 'N/A'],
+                  ['Shortage (Kgs)', '${((trip['shortageKgs'] as double?) ?? 0).toStringAsFixed(2)} Kgs'],
+                ], font, boldFont),
+                pw.SizedBox(height: 14),
+
+                // Reporting & Detention
+                if (trip['reportingDate'] != null || (trip['detentionDays'] as int?) != null)
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionHeader('REPORTING & DETENTION', boldFont),
+                      _buildTable([
+                        if (trip['reportingDate'] != null)
+                          ['Reporting Date', trip['reportingDate'] as String? ?? 'N/A'],
+                        if ((trip['detentionDays'] as int?) != null)
+                          ['Detention Days', '${trip['detentionDays']} day(s)'],
+                      ], font, boldFont),
+                    ],
+                  ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+
+    // FINAL SUMMARY PAGE
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('CONSOLIDATED SUMMARY', boldFont),
+              pw.SizedBox(height: 10),
+              _buildTable([
+                ['Vehicle Number', vehicleNumber],
+                ['Report Period', '${DateFormat('dd-MM-yyyy').format(fromDate)} to ${DateFormat('dd-MM-yyyy').format(toDate)}'],
+                ['Total Trips Completed', '${tripDetails.length}'],
+                ['Total Loading (Kgs)', totalLoading.toStringAsFixed(2)],
+                ['Total Unloading (Kgs)', totalUnloading.toStringAsFixed(2)],
+                ['Total Shortage (Kgs)', totalShortage.toStringAsFixed(2)],
+                ['Total Detention Days', '${tripDetails.fold<int>(0, (sum, t) => sum + ((t['detentionDays'] as int?) ?? 0))} day(s)'],
+                ['Average Loading/Trip (Kgs)', tripDetails.isNotEmpty ? (totalLoading / tripDetails.length).toStringAsFixed(2) : '0.00'],
+                ['Average Unloading/Trip (Kgs)', tripDetails.isNotEmpty ? (totalUnloading / tripDetails.length).toStringAsFixed(2) : '0.00'],
+              ], font, boldFont),
+              pw.SizedBox(height: 30),
+              pw.Spacer(),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey),
+              pw.Center(
+                child: pw.Text(
+                  'Generated by $companyName Fleet Management System',
+                  style: pw.TextStyle(font: font, fontSize: 9, color: PdfColors.grey),
+                ),
+              ),
+              pw.Center(
+                child: pw.Text(
+                  'This is a system-generated document. Generated on $formattedNow',
+                  style: pw.TextStyle(font: font, fontSize: 9, color: PdfColors.grey, fontStyle: pw.FontStyle.italic),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  static pw.Widget _buildSectionHeader(String title, pw.Font font) {
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF2874A6)),
+      child: pw.Text(
+        title,
+        style: pw.TextStyle(font: font, color: PdfColors.white, fontSize: 12),
+      ),
+    );
+  }
+
+  static pw.Widget _buildTable(List<List<String>> data, pw.Font font, pw.Font boldFont) {
+    return pw.Column(
+      children: data.asMap().entries.map((entry) {
+        final index = entry.key;
+        final row = entry.value;
+        final isEven = index % 2 == 0;
+        return pw.Container(
+          decoration: pw.BoxDecoration(
+            color: isEven ? const PdfColor.fromInt(0xFFF5F6FA) : PdfColors.white,
+          ),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: pw.Row(
+            children: [
+              pw.Expanded(
+                flex: 2,
+                child: pw.Text(row[0], style: pw.TextStyle(font: boldFont, fontSize: 10)),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: pw.Text(row[1], style: pw.TextStyle(font: font, fontSize: 10)),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
