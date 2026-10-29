@@ -30,6 +30,10 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
   @override
   void initState() {
     super.initState();
+    // Fetch the latest business name (the admin may have changed it)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.invalidate(businessNameProvider);
+    });
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),

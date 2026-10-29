@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/app_colors.dart';
-import 'package:sanjay_roadlines_fleet/core/constants/app_strings.dart';
 import 'package:sanjay_roadlines_fleet/core/widgets/notification_bell.dart';
 import 'package:sanjay_roadlines_fleet/providers/auth_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/ticket_provider.dart';
@@ -20,10 +19,15 @@ class AdminDashboard extends ConsumerStatefulWidget {
 
 class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   bool _checkedBusinessName = false;
+  bool _showWelcome = true;
 
   @override
   void initState() {
     super.initState();
+    // Show the welcome card for ~1.5 seconds after login, then animate it away
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _showWelcome = false);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _askBusinessNameIfMissing());
   }
 
@@ -34,6 +38,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     if (user == null || user.role != 'admin') return;
     _checkedBusinessName = true;
     try {
+      ref.invalidate(businessNameProvider); // always show the latest saved name
       final name = await ref.read(businessNameProvider.future);
       if (name == null && mounted) {
         await showBusinessNameDialog(context, ref, required: true);
@@ -97,8 +102,9 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         actions: [
           NotificationBell(onTap: () => context.push('/admin/notifications')),
           IconButton(
-            icon: const Icon(Icons.logout, size: 22),
-            onPressed: () => _confirmLogout(context, ref),
+            icon: const Icon(Icons.settings_outlined, size: 24),
+            tooltip: 'Settings',
+            onPressed: () => _showSettings(context, ref),
           ),
         ],
       ),
@@ -126,73 +132,172 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
 
-          // ===== Welcome Banner =====
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+          // ===== Welcome Banner (shows briefly after login, then slides away) =====
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 650),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) => SizeTransition(
+              sizeFactor: animation,
+              axisAlignment: -1,
+              child: FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(begin: const Offset(0, -0.2), end: Offset.zero).animate(animation),
+                  child: child,
+                ),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            child: _showWelcome
+                ? KeyedSubtree(
+                    key: const ValueKey('welcome'),
+                    child:
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
                       children: [
-                        const Text(
-                          'Welcome back,',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Welcome back,',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${user?.fullName ?? "Admin"} 👋',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                  height: 1.3,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Here's what's happening with your fleet today.",
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${user?.fullName ?? "Admin"} 👋',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                            height: 1.3,
+                        const SizedBox(width: 8),
+                        // Truck illustration
+                        Container(
+                          width: 64,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryDark.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          "Here's what's happening with your fleet today.",
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                            height: 1.3,
+                          child: const Icon(
+                            Icons.local_shipping_rounded,
+                            size: 36,
+                            color: AppColors.primaryDark,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  // Truck illustration
-                  Container(
-                    width: 64,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryDark.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.local_shipping_rounded,
-                      size: 36,
-                      color: AppColors.primaryDark,
-                    ),
+                ),
+                  )
+                : const SizedBox(key: ValueKey('no-welcome'), width: double.infinity),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ===== Fleet Overview (stays at the top) =====
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child:
+            // Fleet Overview
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: _cardDecoration(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Fleet Overview', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text('Today', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      // Donut chart
+                      SizedBox(
+                        width: 110,
+                        height: 110,
+                        child: CustomPaint(
+                          painter: _DonutChartPainter(
+                            segments: [
+                              _ChartSegment(inTransitCount.toDouble(), const Color(0xFF27AE60)),
+                              _ChartSegment(availableCount.toDouble(), const Color(0xFF2874A6)),
+                              _ChartSegment(completedTodayCount.toDouble(), const Color(0xFF8E44AD)),
+                              _ChartSegment(maintenanceCount.toDouble(), const Color(0xFFE67E22)),
+                            ],
+                          ),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '$totalVehicles',
+                                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                                ),
+                                const Text('Total\nVehicles', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLegendItem('In Transit', '$inTransitCount', const Color(0xFF27AE60)),
+                            _buildLegendItem('Available', '$availableCount', const Color(0xFF2874A6)),
+                            _buildLegendItem('Completed', '$completedTodayCount', const Color(0xFF8E44AD)),
+                            _buildLegendItem('Maintenance', '$maintenanceCount', const Color(0xFFE67E22)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -288,22 +393,6 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     const Color(0xFF8E44AD),
                     () => context.push('/admin/reports'),
                   ),
-                  _buildMenuCard(
-                    context,
-                    'Manage Drivers',
-                    'Add, view & manage drivers',
-                    Icons.people_outline,
-                    const Color(0xFF16A085),
-                    () => context.push('/admin/manage-drivers'),
-                  ),
-                  _buildMenuCard(
-                    context,
-                    'Manage Vehicles',
-                    'Add, import & remove vehicles',
-                    Icons.local_shipping,
-                    const Color(0xFF34495E),
-                    () => context.push('/admin/manage-vehicles'),
-                  ),
                 ];
                 return Wrap(
                   spacing: spacing,
@@ -316,81 +405,11 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
 
           const SizedBox(height: 20),
 
-          // ===== Fleet Overview + Recent Alerts =====
+          // ===== Recent Alerts =====
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
-                // Fleet Overview
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: _cardDecoration(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Fleet Overview', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.background,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text('Today', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          // Donut chart
-                          SizedBox(
-                            width: 110,
-                            height: 110,
-                            child: CustomPaint(
-                              painter: _DonutChartPainter(
-                                segments: [
-                                  _ChartSegment(inTransitCount.toDouble(), const Color(0xFF27AE60)),
-                                  _ChartSegment(availableCount.toDouble(), const Color(0xFF2874A6)),
-                                  _ChartSegment(completedTodayCount.toDouble(), const Color(0xFF8E44AD)),
-                                  _ChartSegment(maintenanceCount.toDouble(), const Color(0xFFE67E22)),
-                                ],
-                              ),
-                              child: Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      '$totalVehicles',
-                                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-                                    ),
-                                    const Text('Total\nVehicles', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLegendItem('In Transit', '$inTransitCount', const Color(0xFF27AE60)),
-                                _buildLegendItem('Available', '$availableCount', const Color(0xFF2874A6)),
-                                _buildLegendItem('Completed', '$completedTodayCount', const Color(0xFF8E44AD)),
-                                _buildLegendItem('Maintenance', '$maintenanceCount', const Color(0xFFE67E22)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
                 // Recent Alerts
                 Container(
                   width: double.infinity,
@@ -592,6 +611,87 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showSettings(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 12),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Text('Settings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.storefront_outlined, color: AppColors.primaryDark),
+                title: const Text('Business name'),
+                subtitle: Text(
+                  ref.read(businessNameProvider).value ?? 'Not set yet',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.edit_outlined),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  final saved = await showBusinessNameDialog(
+                    context,
+                    ref,
+                    current: ref.read(businessNameProvider).value,
+                  );
+                  if (saved != null && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Business name updated to "$saved"'),
+                        backgroundColor: AppColors.successGreen,
+                      ),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.people_outline, color: AppColors.primaryDark),
+                title: const Text('Manage Drivers'),
+                subtitle: const Text('Add, view & remove drivers'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  context.push('/admin/manage-drivers');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.local_shipping_outlined, color: AppColors.primaryDark),
+                title: const Text('Manage Vehicles'),
+                subtitle: const Text('Add, import & remove vehicles'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  context.push('/admin/manage-vehicles');
+                },
+              ),
+              const Divider(height: 16),
+              ListTile(
+                leading: const Icon(Icons.logout, color: AppColors.errorRed),
+                title: const Text('Log out', style: TextStyle(color: AppColors.errorRed, fontWeight: FontWeight.w600)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _confirmLogout(context, ref);
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

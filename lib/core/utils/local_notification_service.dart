@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_mlkit_translation/google_mlkit_translation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
@@ -61,9 +62,41 @@ class LocalNotificationService {
     await _plugin.show(id, title, body, details);
   }
 
+  /// IDs of notifications already shown as a pop-up on this phone.
+  /// Saved on the phone so a notification pops up only once, ever —
+  /// not again every time the app is opened or a screen changes.
+  static const String _shownIdsKey = 'shown_notification_ids';
+  static Set<String>? _shownIds;
+  static String? _listeningFor;
+
+  static Future<Set<String>> _loadShownIds() async {
+    if (_shownIds != null) return _shownIds!;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _shownIds = (prefs.getStringList(_shownIdsKey) ?? const <String>[]).toSet();
+    } catch (_) {
+      _shownIds = <String>{};
+    }
+    return _shownIds!;
+  }
+
+  static Future<void> _rememberShown(String id) async {
+    final ids = await _loadShownIds();
+    ids.add(id);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = ids.toList();
+      // keep the list small
+      await prefs.setStringList(_shownIdsKey, list.length > 300 ? list.sublist(list.length - 300) : list);
+    } catch (_) {}
+  }
+
   /// Listen to real-time notifications from Supabase and show as pop-ups
   static void startListening(String targetUserId) {
+    // Already listening for this user: don't restart (restarting re-sends the latest notification)
+    if (_subscription != null && _listeningFor == targetUserId) return;
     _subscription?.cancel();
+    _listeningFor = targetUserId;
 
     _subscription = Supabase.instance.client
         .from(SupabaseConstants.tableNotifications)
@@ -71,23 +104,27 @@ class LocalNotificationService {
         .eq('target_user_id', targetUserId)
         .order('created_at', ascending: false)
         .limit(1)
-        .listen((data) {
-          if (data.isNotEmpty) {
-            final notif = data.first;
-            final title = notif['title'] as String? ?? 'Notification';
-            final message = notif['message'] as String? ?? '';
-            final isRead = notif['is_read'] as bool? ?? false;
+        .listen((data) async {
+          if (data.isEmpty) return;
+          final notif = data.first;
+          final id = notif['id']?.toString();
+          final isRead = notif['is_read'] as bool? ?? false;
+          if (id == null || isRead) return;
 
-            if (!isRead) {
-              showNotification(title: title, body: message);
-            }
-          }
+          final shown = await _loadShownIds();
+          if (shown.contains(id)) return; // already popped up once
+          await _rememberShown(id);
+
+          final title = notif['title'] as String? ?? 'Notification';
+          final message = notif['message'] as String? ?? '';
+          showNotification(title: title, body: message, id: id.hashCode & 0x7fffffff);
         });
   }
 
   static void stopListening() {
     _subscription?.cancel();
     _subscription = null;
+    _listeningFor = null;
   }
 
   static TranslationService? _translationService;

@@ -669,7 +669,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
       final pdfBytes = await PdfGenerator.generateConsolidatedReport(
         vehicleNumber: _selectedVehicleNumber!,
         tripDetails: List<Map<String, dynamic>>.from(report['tripDetails']),
-        companyName: ref.read(businessNameProvider).value ?? AppStrings.appName,
+        companyName: await currentBusinessName(ref),
         fromDate: fromDate,
         toDate: toDate,
       );

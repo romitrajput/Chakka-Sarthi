@@ -14,7 +14,6 @@ import 'package:sanjay_roadlines_fleet/core/utils/local_notification_service.dar
 import 'package:sanjay_roadlines_fleet/repositories/notification_repository.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
-import 'package:sanjay_roadlines_fleet/core/constants/app_strings.dart';
 import 'package:image_picker/image_picker.dart';
 
 class UnloadingFormScreen extends ConsumerStatefulWidget {
@@ -262,7 +261,7 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
           ),
           loading: loading,
           unloading: unloadingStatus,
-          companyName: ref.read(businessNameProvider).value ?? AppStrings.appName,
+          companyName: await currentBusinessName(ref),
         );
       } catch (_) {
         pdfBytes = Uint8List(0);
@@ -429,6 +428,57 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
                     ),
                     const SizedBox(height: 16),
 
+                    // REPORTING DATE
+                    Text(
+                      currentLocale.languageCode == 'hi' ? 'रिपोर्टिंग तिथि' : 'Reporting Date',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _reportingDateController,
+                      readOnly: true,
+                      onTap: _pickReportingDate,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: currentLocale.languageCode == 'hi' ? 'तिथि चुनें' : 'Select Date',
+                        prefixIcon: const Icon(
+                          Icons.calendar_today,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.divider),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.divider),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                            color: AppColors.primaryDark,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Reporting date is required';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
                     // UNLOADING DATE (Manual Entry)
                     Text(
                       currentLocale.languageCode == 'hi' ? 'अनलोडिंग तिथि' : 'Unloading Date',
@@ -442,7 +492,7 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
                     TextFormField(
                       controller: _unloadingDateController,
                       readOnly: true,
-                      onTap: () => _showDatePicker(context, _unloadingDateController, ' unloadingDate'),
+                      onTap: () => _showDatePicker(context, _unloadingDateController, 'unloadingDate'),
                       style: const TextStyle(fontSize: 14),
                       decoration: InputDecoration(
                         hintText: currentLocale.languageCode == 'hi' ? 'तिथि चुनें' : 'Select Unloading Date',
@@ -530,57 +580,6 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // REPORTING DATE
-                    Text(
-                      currentLocale.languageCode == 'hi' ? 'रिपोर्टिंग तिथि' : 'Reporting Date',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextFormField(
-                      controller: _reportingDateController,
-                      readOnly: true,
-                      onTap: _pickReportingDate,
-                      style: const TextStyle(fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: currentLocale.languageCode == 'hi' ? 'तिथि चुनें' : 'Select Date',
-                        prefixIcon: const Icon(
-                          Icons.calendar_today,
-                          size: 20,
-                          color: AppColors.textSecondary,
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: AppColors.divider),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: AppColors.divider),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: AppColors.primaryDark,
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Reporting date is required';
-                        return null;
-                      },
                     ),
                     const SizedBox(height: 24),
 

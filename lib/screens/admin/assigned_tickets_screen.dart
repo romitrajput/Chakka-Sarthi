@@ -9,6 +9,7 @@ import 'package:sanjay_roadlines_fleet/providers/auth_provider.dart';
 import 'package:sanjay_roadlines_fleet/repositories/ticket_repository.dart';
 import 'package:sanjay_roadlines_fleet/repositories/notification_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sanjay_roadlines_fleet/core/widgets/reassignment_history.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 
 final reassignDriversProvider = FutureProvider<List<UserModel>>((ref) async {
@@ -23,7 +24,18 @@ final reassignDriversProvider = FutureProvider<List<UserModel>>((ref) async {
       .eq('is_active', true)
       .order('full_name');
 
-  return (response as List).map((json) => UserModel.fromJson(json as Map<String, dynamic>)).toList();
+  // Hide drivers who already have a trip that is assigned or in transit
+  final busy = await Supabase.instance.client
+      .from(SupabaseConstants.tableTickets)
+      .select('driver_user_id')
+      .eq('company_code', user.companyCode)
+      .inFilter('status', ['assigned', 'in_transit']);
+  final busyIds = (busy as List).map((t) => t['driver_user_id'] as String).toSet();
+
+  return (response as List)
+      .map((json) => UserModel.fromJson(json as Map<String, dynamic>))
+      .where((d) => !busyIds.contains(d.userId))
+      .toList();
 });
 
 class AdminAssignedTicketsScreen extends ConsumerStatefulWidget {
@@ -495,18 +507,29 @@ class _ReassignTicketCard extends StatelessWidget {
                 ),
                 if (ticket.reassignmentCount > 0) ...[
                   const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.inTransitBg,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Reassigned ×${ticket.reassignmentCount}',
-                      style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.warningYellow),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => showReassignmentHistory(context, ticket.ticketId),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.inTransitBg,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.history, size: 13, color: AppColors.warningYellow),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Reassigned ×${ticket.reassignmentCount} · History',
+                            style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.warningYellow),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

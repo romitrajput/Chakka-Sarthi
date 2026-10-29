@@ -11,6 +11,7 @@ import 'package:sanjay_roadlines_fleet/providers/ticket_provider.dart';
 import 'package:sanjay_roadlines_fleet/repositories/loading_unloading_repository.dart';
 import 'package:sanjay_roadlines_fleet/repositories/ticket_repository.dart';
 import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
+import 'package:sanjay_roadlines_fleet/core/widgets/reassignment_history.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class CompletedTripsScreen extends ConsumerStatefulWidget {
@@ -311,6 +312,14 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
                   if (ticket.detentionDays != null)
                     _buildDetailRow('Detention Days', '${ticket.detentionDays} days'),
 
+                  if (ticket.reassignmentCount > 0) ...[
+                    const Divider(height: 32),
+                    Text('Driver history (re-assigned ${ticket.reassignmentCount}×)',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    ReassignmentHistory(ticketId: ticket.ticketId),
+                  ],
+
                   if (loadingStatus != null) ...[
                     const Divider(height: 32),
                     const Text('Loading Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -474,7 +483,7 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
         ticket: ticket,
         loading: loading,
         unloading: unloading,
-        companyName: ref.read(businessNameProvider).value ?? AppStrings.appName,
+        companyName: await currentBusinessName(ref),
       );
 
       await Printing.layoutPdf(

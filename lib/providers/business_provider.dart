@@ -52,6 +52,15 @@ final businessNameProvider = FutureProvider<String?>((ref) async {
   }
 });
 
+/// The freshest business name for PDFs and reports (falls back to the app name).
+Future<String> currentBusinessName(WidgetRef ref) async {
+  try {
+    final name = await ref.read(businessNameProvider.future);
+    if (name != null) return name;
+  } catch (_) {}
+  return (await cachedBusinessName()) ?? 'Chakka Saarthi';
+}
+
 /// Saves the business name for the admin's company and refreshes it everywhere.
 Future<void> saveBusinessName(WidgetRef ref, String companyCode, String name) async {
   final clean = name.trim();
@@ -100,7 +109,7 @@ Future<String?> showBusinessNameDialog(
                   const Padding(
                     padding: EdgeInsets.only(bottom: 12),
                     child: Text(
-                      'This name is shown at the top of the app for you and your drivers, and on PDF reports. You can change it later by tapping it.',
+                      'This name is shown at the top of the app for you and your drivers, and on every PDF report. You can change it later in Settings.',
                       style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                     ),
                   ),
@@ -174,6 +183,8 @@ class BusinessAppBarTitle extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final name = ref.watch(businessNameProvider).value;
+    // Once the business name is set it is locked (no edit option in the app)
+    final canEdit = editable && name == null;
     final title = Row(
       children: [
         ClipRRect(
@@ -187,7 +198,7 @@ class BusinessAppBarTitle extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                name ?? (editable ? 'Tap to add business name' : 'Chakka Saarthi'),
+                name ?? (canEdit ? 'Tap to add business name' : 'Chakka Saarthi'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
@@ -200,13 +211,13 @@ class BusinessAppBarTitle extends ConsumerWidget {
             ],
           ),
         ),
-        if (editable) ...[
+        if (canEdit) ...[
           const SizedBox(width: 4),
           const Icon(Icons.edit, size: 14, color: Colors.white70),
         ],
       ],
     );
-    if (!editable) return title;
+    if (!canEdit) return title;
     return InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: () => showBusinessNameDialog(context, ref, current: name),

@@ -27,8 +27,19 @@ final driversProvider = FutureProvider.autoDispose<List<UserModel>>((ref) async 
       .eq('role', 'driver')
       .eq('is_active', true)
       .order('full_name');
-  
-  return (response as List).map((json) => UserModel.fromJson(json as Map<String, dynamic>)).toList();
+
+  // Hide drivers who already have a trip that is assigned or in transit
+  final busy = await Supabase.instance.client
+      .from(SupabaseConstants.tableTickets)
+      .select('driver_user_id')
+      .eq('company_code', user.companyCode)
+      .inFilter('status', ['assigned', 'in_transit']);
+  final busyIds = (busy as List).map((t) => t['driver_user_id'] as String).toSet();
+
+  return (response as List)
+      .map((json) => UserModel.fromJson(json as Map<String, dynamic>))
+      .where((d) => !busyIds.contains(d.userId))
+      .toList();
 });
 
 class CreateTicketScreen extends ConsumerStatefulWidget {

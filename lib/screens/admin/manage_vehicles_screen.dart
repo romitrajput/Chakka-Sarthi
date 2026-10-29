@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -8,199 +9,223 @@ import 'package:sanjay_roadlines_fleet/core/widgets/app_text_field.dart';
 import 'package:sanjay_roadlines_fleet/core/widgets/status_chip.dart';
 import 'package:sanjay_roadlines_fleet/models/vehicle_model.dart';
 import 'package:sanjay_roadlines_fleet/providers/vehicle_provider.dart';
-import 'package:sanjay_roadlines_fleet/providers/auth_provider.dart';
-import 'package:sanjay_roadlines_fleet/app.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 
-class ManageVehiclesScreen extends ConsumerWidget {
+class ManageVehiclesScreen extends ConsumerStatefulWidget {
   const ManageVehiclesScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final vehicleState = ref.watch(vehicleStateProvider);
+  ConsumerState<ManageVehiclesScreen> createState() => _ManageVehiclesScreenState();
+}
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Vehicles'),
-      ),
-      body: vehicleState.when(
-        data: (vehicles) {
-          if (vehicles.isEmpty) {
-            return const Center(child: Text('No vehicles found'));
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.only(bottom: 80),
-            itemCount: vehicles.length,
-            itemBuilder: (context, index) {
-              final vehicle = vehicles[index];
-              return Card(
-                child: ListTile(
-                  onTap: () => _showVehicleDetails(context, ref, vehicle),
-                  title: Text(
-                    vehicle.vehicleNumber,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    'Status: ${vehicle.status.toUpperCase()}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: vehicle.status == 'available'
-                          ? AppColors.successGreen
-                          : vehicle.status == 'maintenance'
-                              ? AppColors.errorRed
-                              : AppColors.primaryDark,
-                    ),
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                ),
-              );
-            },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-      ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Remove All button
-          FloatingActionButton.extended(
-            onPressed: () => _showRemoveAllDialog(context, ref),
-            label: const Text('Remove All', style: TextStyle(color: Colors.white)),
-            icon: const Icon(Icons.delete_sweep, color: Colors.white),
-            backgroundColor: AppColors.errorRed,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-          const SizedBox(height: 12),
-          // Import button
-          FloatingActionButton.extended(
-            onPressed: () => _showImportDialog(context, ref),
-            label: Text(
-              ref.watch(languageProvider).languageCode == 'hi' ? 'वाहन आयात करें' : 'Import Vehicles',
-              style: const TextStyle(color: Colors.white),
-            ),
-            icon: const Icon(Icons.file_upload, color: Colors.white),
-            backgroundColor: AppColors.primaryMid,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-          const SizedBox(height: 12),
-          // Add vehicle button
-          FloatingActionButton.extended(
-            onPressed: () => _showAddVehicleSheet(context, ref),
-            label: Text(
-              ref.watch(languageProvider).languageCode == 'hi' ? 'वाहन जोड़ें' : 'Add Vehicle',
-              style: const TextStyle(color: Colors.white),
-            ),
-            icon: const Icon(Icons.add_box_outlined, color: Colors.white),
-            backgroundColor: AppColors.accentOrange,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        ],
-      ),
-    );
+class _ManageVehiclesScreenState extends ConsumerState<ManageVehiclesScreen> {
+  // Multi-select delete mode (same behaviour as Manage Drivers)
+  bool _selectMode = false;
+  final Set<String> _selectedIds = {};
+
+  void _exitSelectMode() {
+    setState(() {
+      _selectMode = false;
+      _selectedIds.clear();
+    });
   }
 
-  void _showVehicleDetails(BuildContext context, WidgetRef ref, VehicleModel vehicle) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              vehicle.vehicleNumber,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            StatusChip(status: vehicle.status),
-            const SizedBox(height: 24),
-            AppButton(
-              text: 'REMOVE VEHICLE',
-              backgroundColor: AppColors.errorRed,
-              onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: ctx,
-                  builder: (dialogCtx) => AlertDialog(
-                    title: const Text('Remove Vehicle'),
-                    content: Text(
-                      'Are you sure you want to permanently remove ${vehicle.vehicleNumber}? This cannot be undone.',
+  void _toggleSelected(String id) {
+    setState(() {
+      if (!_selectedIds.remove(id)) _selectedIds.add(id);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vehicleState = ref.watch(vehicleStateProvider);
+    final vehicles = vehicleState.value ?? const <VehicleModel>[];
+    // Vehicles on a trip can't be deleted
+    final deletable = vehicles.where((v) => v.status != 'in_transit').toList();
+    final allSelected = deletable.isNotEmpty && _selectedIds.length == deletable.length;
+
+    return PopScope(
+      canPop: !_selectMode,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _selectMode) _exitSelectMode();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: _selectMode
+              ? IconButton(icon: const Icon(Icons.close), tooltip: 'Cancel', onPressed: _exitSelectMode)
+              : null,
+          title: Text(_selectMode ? '${_selectedIds.length} selected' : 'Manage Vehicles'),
+          actions: _selectMode
+              ? [
+                  IconButton(
+                    icon: Icon(allSelected ? Icons.deselect : Icons.select_all),
+                    tooltip: allSelected ? 'Clear selection' : 'Select all',
+                    onPressed: () => setState(() {
+                      if (allSelected) {
+                        _selectedIds.clear();
+                      } else {
+                        _selectedIds
+                          ..clear()
+                          ..addAll(deletable.map((v) => v.id));
+                      }
+                    }),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_forever),
+                    tooltip: 'Delete selected',
+                    onPressed: _selectedIds.isEmpty ? null : () => _confirmDeleteSelected(vehicles),
+                  ),
+                ]
+              : [
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    tooltip: 'Add vehicles',
+                    onPressed: _showAddOptions,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: 'Delete vehicles',
+                    onPressed: vehicles.isEmpty ? null : () => setState(() => _selectMode = true),
+                  ),
+                ],
+        ),
+        body: vehicleState.when(
+          data: (vehicles) {
+            if (vehicles.isEmpty) {
+              return const Center(child: Text('No vehicles found. Tap + to add one.'));
+            }
+            return ListView.builder(
+              padding: const EdgeInsets.only(bottom: 24),
+              itemCount: vehicles.length,
+              itemBuilder: (context, index) {
+                final vehicle = vehicles[index];
+                final onTrip = vehicle.status == 'in_transit';
+                final selected = _selectedIds.contains(vehicle.id);
+                return Card(
+                  color: selected ? AppColors.primaryDark.withValues(alpha: 0.08) : null,
+                  child: ListTile(
+                    leading: _selectMode
+                        ? Checkbox(
+                            value: selected,
+                            onChanged: onTrip ? null : (_) => _toggleSelected(vehicle.id),
+                          )
+                        : null,
+                    onTap: _selectMode
+                        ? (onTrip ? null : () => _toggleSelected(vehicle.id))
+                        : () => _showVehicleDetails(vehicle),
+                    onLongPress: _selectMode || onTrip
+                        ? null
+                        : () => setState(() {
+                              _selectMode = true;
+                              _selectedIds.add(vehicle.id);
+                            }),
+                    title: Text(
+                      vehicle.vehicleNumber,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(dialogCtx, false),
-                        child: const Text('Cancel'),
+                    subtitle: Text(
+                      _selectMode && onTrip
+                          ? 'On a trip — can\'t be deleted'
+                          : 'Status: ${vehicle.status.replaceAll('_', ' ').toUpperCase()}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: vehicle.status == 'available'
+                            ? AppColors.successGreen
+                            : vehicle.status == 'maintenance'
+                                ? AppColors.errorRed
+                                : AppColors.primaryDark,
                       ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(dialogCtx, true),
-                        child: const Text('Remove', style: TextStyle(color: AppColors.errorRed)),
-                      ),
-                    ],
+                    ),
+                    trailing: _selectMode ? null : const Icon(Icons.chevron_right),
                   ),
                 );
-                if (confirm != true) return;
-
-                if (!context.mounted) return;
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
-                final navigator = Navigator.of(context);
-
-                try {
-                  await ref.read(vehicleStateProvider.notifier).deleteVehicle(vehicle.id);
-                  if (context.mounted) {
-                    navigator.pop();
-                    scaffoldMessenger.showSnackBar(
-                      SnackBar(
-                        content: Text('${vehicle.vehicleNumber} has been removed'),
-                        backgroundColor: AppColors.successGreen,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    scaffoldMessenger.showSnackBar(
-                      SnackBar(
-                        content: Text('Failed to remove vehicle: $e'),
-                        backgroundColor: AppColors.errorRed,
-                      ),
-                    );
-                  }
-                }
               },
-            ),
-            const SizedBox(height: 16),
-          ],
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Error: $e')),
         ),
       ),
     );
   }
 
-  void _showRemoveAllDialog(BuildContext context, WidgetRef ref) async {
-    final user = ref.read(authStateProvider).value;
-    if (user == null) return;
+  /// "+" menu: add one vehicle, or import many from a file.
+  void _showAddOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.add_box_outlined, color: AppColors.primaryDark),
+                title: const Text('Add Vehicle'),
+                subtitle: const Text('Enter one vehicle\'s details'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showAddVehicleSheet();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.upload_file, color: AppColors.primaryDark),
+                title: const Text('Import Vehicles (bulk upload)'),
+                subtitle: const Text('Upload a CSV file with many vehicles'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showImportDialog();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-    // Count vehicles first
-    final vehicleState = ref.read(vehicleStateProvider);
-    final count = vehicleState.maybeWhen(data: (v) => v.length, orElse: () => 0);
+  void _showVehicleDetails(VehicleModel vehicle) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(height: 24),
+              Text(vehicle.vehicleNumber, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              StatusChip(status: vehicle.status),
+              const SizedBox(height: 16),
+              const Text(
+                'To delete vehicles, tap the bin icon at the top of the list.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-    if (count == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No vehicles to remove'), backgroundColor: AppColors.errorRed),
-      );
-      return;
-    }
+  Future<void> _confirmDeleteSelected(List<VehicleModel> vehicles) async {
+    final toDelete = vehicles.where((v) => _selectedIds.contains(v.id)).toList();
+    if (toDelete.isEmpty) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -210,26 +235,42 @@ class ManageVehiclesScreen extends ConsumerWidget {
           children: [
             Icon(Icons.warning_amber_rounded, color: AppColors.errorRed),
             SizedBox(width: 8),
-            Text('Remove All Vehicles'),
+            Expanded(child: Text('Permanently delete vehicle details?')),
           ],
         ),
-        content: Text(
-          'Are you sure you want to permanently remove all $count vehicles?\n\nThis action cannot be undone.',
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(toDelete.length == 1
+                  ? 'This vehicle will be permanently deleted:'
+                  : 'These ${toDelete.length} vehicles will be permanently deleted:'),
+              const SizedBox(height: 12),
+              ...toDelete.map((v) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text('• ${v.vehicleNumber}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  )),
+              const SizedBox(height: 12),
+              const Text('This cannot be undone.', style: TextStyle(color: AppColors.errorRed)),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
-            child: const Text('Remove All'),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed, foregroundColor: Colors.white),
+            child: const Text('Delete'),
           ),
         ],
       ),
     );
 
-    if (confirmed != true || !context.mounted) return;
+    if (confirmed != true || !mounted) return;
 
-    // Show loading
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -240,27 +281,28 @@ class ManageVehiclesScreen extends ConsumerWidget {
       await Supabase.instance.client
           .from(SupabaseConstants.tableVehicles)
           .delete()
-          .eq('company_code', user.companyCode);
-
+          .inFilter('id', toDelete.map((v) => v.id).toList())
+          .neq('status', 'in_transit');
       ref.invalidate(vehicleStateProvider);
-
-      if (context.mounted) {
-        Navigator.pop(context); // dismiss loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('All $count vehicles removed'), backgroundColor: AppColors.successGreen),
-        );
-      }
+      navigator.pop(); // dismiss loading
+      _exitSelectMode();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(toDelete.length == 1
+              ? '${toDelete.first.vehicleNumber} has been deleted'
+              : '${toDelete.length} vehicles deleted'),
+          backgroundColor: AppColors.successGreen,
+        ),
+      );
     } catch (e) {
-      if (context.mounted) {
-        Navigator.pop(context); // dismiss loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.errorRed),
-        );
-      }
+      navigator.pop(); // dismiss loading
+      messenger.showSnackBar(
+        SnackBar(content: Text('Failed to delete: $e'), backgroundColor: AppColors.errorRed),
+      );
     }
   }
 
-  void _showAddVehicleSheet(BuildContext context, WidgetRef ref) {
+  void _showAddVehicleSheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -271,66 +313,64 @@ class ManageVehiclesScreen extends ConsumerWidget {
     );
   }
 
-  void _showImportDialog(BuildContext context, WidgetRef ref) {
+  void _showImportDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Import Vehicles'),
-        content: const Text('Select a CSV or Excel file with vehicle numbers.\n\nExpected format:\nvehicle_number\nMH01AB1234\nMH02CD5678'),
+        content: const Text(
+          'Choose a CSV file with one vehicle number per line.\n\n'
+          'Example:\nvehicle_number\nMH01AB1234\nMH02CD5678\n\n'
+          'Tip: in Excel or Google Sheets, use "Save as / Download → CSV".',
+        ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CANCEL'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
-              _importVehicles(context, ref);
+              Navigator.pop(dialogContext);
+              _importVehicles();
             },
-            child: const Text('SELECT FILE'),
+            child: const Text('CHOOSE FILE'),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _importVehicles(BuildContext context, WidgetRef ref) async {
+  Future<void> _importVehicles() async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['csv', 'xlsx', 'xls'],
+        allowedExtensions: ['csv', 'txt'],
+        withData: true, // needed on Android, otherwise the file contents are empty
       );
 
       if (result == null || result.files.isEmpty) return;
 
-      final file = result.files.first;
-      final bytes = file.bytes;
-      
+      final bytes = result.files.first.bytes;
       if (bytes == null) {
-        if (context.mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Could not read file'), backgroundColor: AppColors.errorRed),
           );
         }
         return;
       }
-      
-      // Parse CSV
-      final csvString = String.fromCharCodes(bytes);
-      final List<List<dynamic>> rows = const CsvToListConverter().convert(csvString);
-      
-      List<String> vehicleNumbers = [];
-      for (var row in rows) {
-        if (row.isNotEmpty) {
-          final value = row[0].toString().trim();
-          if (value.isNotEmpty && value != 'vehicle_number' && value != 'Vehicle Number') {
-            vehicleNumbers.add(value);
-          }
-        }
+
+      // Parse CSV (strip an Excel "BOM" marker if present)
+      final csvString = utf8.decode(bytes, allowMalformed: true).replaceFirst('﻿', '');
+      final List<List<dynamic>> rows = const CsvToListConverter(eol: '\n').convert(csvString.replaceAll('\r\n', '\n'));
+
+      final vehicleNumbers = <String>{};
+      for (final row in rows) {
+        if (row.isEmpty) continue;
+        final value = row[0].toString().trim().toUpperCase().replaceAll(' ', '');
+        if (value.isEmpty || value == 'VEHICLE_NUMBER' || value == 'VEHICLENUMBER') continue;
+        vehicleNumbers.add(value);
       }
 
       if (vehicleNumbers.isEmpty) {
-        if (context.mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('No vehicle numbers found in file'), backgroundColor: AppColors.errorRed),
           );
@@ -338,34 +378,29 @@ class ManageVehiclesScreen extends ConsumerWidget {
         return;
       }
 
-      // Show confirmation
-      if (context.mounted) {
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Confirm Import'),
-            content: Text('Found ${vehicleNumbers.length} vehicles. Import now?'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
-              ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('IMPORT')),
-            ],
-          ),
-        );
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Confirm Import'),
+          content: Text('Found ${vehicleNumbers.length} vehicles. Import now?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('CANCEL')),
+            ElevatedButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('IMPORT')),
+          ],
+        ),
+      );
 
-        if (confirmed == true) {
-          final count = await ref.read(vehicleStateProvider.notifier).bulkInsertVehicles(vehicleNumbers);
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Imported $count vehicles successfully'),
-                backgroundColor: AppColors.successGreen,
-              ),
-            );
-          }
+      if (confirmed == true) {
+        final count = await ref.read(vehicleStateProvider.notifier).bulkInsertVehicles(vehicleNumbers.toList());
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Imported $count vehicles successfully'), backgroundColor: AppColors.successGreen),
+          );
         }
       }
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error importing: $e'), backgroundColor: AppColors.errorRed),
         );

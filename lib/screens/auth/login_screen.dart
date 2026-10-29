@@ -311,36 +311,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final screenW = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
+      backgroundColor: const Color(0xFF14161F),
       body: Stack(
         children: [
-          // ========== BACKGROUND: Road image covering top ~38% ==========
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: screenH * 0.38,
-            child: Image.asset(
-              'assets/images/03_road_background.png',
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-            ),
-          ),
-
-          // ========== Dark gradient overlay for text readability ==========
+          // ========== BACKGROUND: plain brand colour (old Sanjay Roadlines image removed) ==========
           Positioned(
             top: 0,
             left: 0,
             right: 0,
             height: screenH * 0.38,
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF0D1B2A).withValues(alpha: 0.2),
-                    Colors.transparent,
-                    const Color(0xFF0D1B2A).withValues(alpha: 0.5),
-                  ],
+                  colors: [Color(0xFF14161F), Color(0xFF2A2E3B)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
