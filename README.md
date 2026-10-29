@@ -1,4 +1,4 @@
-# Sanjay Roadlines - Fleet Management App
+# Chakka Saarthi - Fleet Management App
 
 A comprehensive Flutter-based fleet management application for managing vehicles, drivers, and trip assignments. Built with Supabase backend integration.
 
