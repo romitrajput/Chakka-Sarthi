@@ -3,6 +3,7 @@ on: workflow_dispatch
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -13,7 +14,7 @@ jobs:
         with:
           channel: stable
       - run: flutter pub get
-      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter build apk --release --build-number=${{ github.run_number }}
       - uses: actions/upload-artifact@v4
         with:
           name: fleet-app-build-${{ github.run_number }}
