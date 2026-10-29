@@ -14,6 +14,7 @@ import 'package:sanjay_roadlines_fleet/repositories/loading_unloading_repository
 import 'package:sanjay_roadlines_fleet/repositories/ticket_repository.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
@@ -668,7 +669,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
       final pdfBytes = await PdfGenerator.generateConsolidatedReport(
         vehicleNumber: _selectedVehicleNumber!,
         tripDetails: List<Map<String, dynamic>>.from(report['tripDetails']),
-        companyName: 'Sanjay Roadlines',
+        companyName: ref.read(businessNameProvider).value ?? AppStrings.appName,
         fromDate: fromDate,
         toDate: toDate,
       );

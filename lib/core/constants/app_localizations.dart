@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class AppLocalizations {
   static const Map<String, Map<String, String>> _translations = {
     'en': {
-      'appName': 'Sanjay Roadlines',
+      'appName': 'Chakka Saarthi',
       'fleetManagement': 'Fleet Management',
       'login': 'Login',
       'userId': 'User ID',
@@ -97,7 +97,7 @@ class AppLocalizations {
       'consolidatedReport': 'Consolidated Report',
     },
     'hi': {
-      'appName': 'संजय रोडलाइन्स',
+      'appName': 'चक्का सारथी',
       'fleetManagement': 'फ्लीट प्रबंधन',
       'login': 'लॉगिन',
       'userId': 'यूजर आईडी',

@@ -16,7 +16,7 @@ import 'package:sanjay_roadlines_fleet/core/utils/local_notification_service.dar
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 
-final driversProvider = FutureProvider<List<UserModel>>((ref) async {
+final driversProvider = FutureProvider.autoDispose<List<UserModel>>((ref) async {
   final user = ref.watch(authStateProvider).value;
   if (user == null) return [];
   

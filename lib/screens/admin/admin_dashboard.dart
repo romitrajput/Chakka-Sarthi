@@ -8,6 +8,7 @@ import 'package:sanjay_roadlines_fleet/core/widgets/notification_bell.dart';
 import 'package:sanjay_roadlines_fleet/providers/auth_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/ticket_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/vehicle_provider.dart';
+import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class AdminDashboard extends ConsumerStatefulWidget {
@@ -18,11 +19,37 @@ class AdminDashboard extends ConsumerStatefulWidget {
 }
 
 class _AdminDashboardState extends ConsumerState<AdminDashboard> {
+  bool _checkedBusinessName = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _askBusinessNameIfMissing());
+  }
+
+  /// First time an admin opens the app, ask for the business name.
+  Future<void> _askBusinessNameIfMissing() async {
+    if (_checkedBusinessName) return;
+    final user = ref.read(authStateProvider).value;
+    if (user == null || user.role != 'admin') return;
+    _checkedBusinessName = true;
+    try {
+      final name = await ref.read(businessNameProvider.future);
+      if (name == null && mounted) {
+        await showBusinessNameDialog(context, ref, required: true);
+      }
+    } catch (_) {
+      // Ignore: the admin can still tap "Tap to add business name" in the header
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authStateProvider).value;
     final currentLocale = ref.watch(languageProvider);
+    if (!_checkedBusinessName && user != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _askBusinessNameIfMissing());
+    }
 
     // Data
     final ticketState = ref.watch(ticketStateProvider);
@@ -65,13 +92,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
       appBar: AppBar(
         backgroundColor: AppColors.primaryDark,
         foregroundColor: Colors.white,
-        title: Row(
-          children: [
-            const Text('SR', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-            const SizedBox(width: 8),
-            Text(AppStrings.appName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          ],
-        ),
+        titleSpacing: 12,
+        title: const BusinessAppBarTitle(editable: true),
         actions: [
           NotificationBell(onTap: () => context.push('/admin/notifications')),
           IconButton(
@@ -273,6 +295,14 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     Icons.people_outline,
                     const Color(0xFF16A085),
                     () => context.push('/admin/manage-drivers'),
+                  ),
+                  _buildMenuCard(
+                    context,
+                    'Manage Vehicles',
+                    'Add, import & remove vehicles',
+                    Icons.local_shipping,
+                    const Color(0xFF34495E),
+                    () => context.push('/admin/manage-vehicles'),
                   ),
                 ];
                 return Wrap(

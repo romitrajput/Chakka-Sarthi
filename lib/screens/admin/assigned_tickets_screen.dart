@@ -156,6 +156,7 @@ class _AdminAssignedTicketsScreenState
     // Fetch drivers first before showing dialog
     List<UserModel> drivers = [];
     try {
+      ref.invalidate(reassignDriversProvider); // always fetch the latest active drivers
       drivers = await ref.read(reassignDriversProvider.future);
     } catch (e) {
       if (mounted) {

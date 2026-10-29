@@ -6,6 +6,7 @@ import 'package:sanjay_roadlines_fleet/core/constants/app_colors.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/app_strings.dart';
 import 'package:sanjay_roadlines_fleet/providers/auth_provider.dart';
 import 'package:sanjay_roadlines_fleet/models/user_model.dart';
+import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -23,11 +24,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
   bool _isLoggingIn = false;
   bool _isRedirecting = false;
+  String? _businessName;
 
   @override
   void initState() {
     super.initState();
     _loadSavedUserId();
+    cachedBusinessName().then((name) {
+      if (mounted && name != null) setState(() => _businessName = name);
+    });
   }
 
   Future<void> _loadSavedUserId() async {
@@ -343,6 +348,55 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
 
+          // ========== BRAND: logo, app name and business name ==========
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: screenH * 0.30,
+            child: SafeArea(
+              bottom: false,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(screenW * 0.05),
+                      child: Image.asset(
+                        'assets/images/chakka_saarthi_icon.png',
+                        width: screenW * 0.2,
+                        height: screenW * 0.2,
+                      ),
+                    ),
+                    SizedBox(height: screenH * 0.012),
+                    Text(
+                      _businessName ?? AppStrings.appName,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: screenW * 0.055,
+                        fontWeight: FontWeight.w800,
+                        shadows: const [Shadow(blurRadius: 8, color: Colors.black54)],
+                      ),
+                    ),
+                    if (_businessName != null)
+                      Text(
+                        AppStrings.appName,
+                        style: TextStyle(
+                          color: const Color(0xFFFFD23F),
+                          fontSize: screenW * 0.032,
+                          fontWeight: FontWeight.w600,
+                          shadows: const [Shadow(blurRadius: 6, color: Colors.black54)],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
           // ========== WHITE CARD: Asymmetric rounded top-left corner ==========
           Positioned(
             top: screenH * 0.30,
@@ -625,7 +679,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         SizedBox(height: screenH * 0.01),
                         Center(
                           child: Text(
-                            '© 2026 Sanjay Roadlines. All rights reserved.',
+                            '© 2026 Chakka Saarthi. All rights reserved.',
                             style: TextStyle(
                               fontSize: screenW * 0.028,
                               color: Colors.grey.shade400,

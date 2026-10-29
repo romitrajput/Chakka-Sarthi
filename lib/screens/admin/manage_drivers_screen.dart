@@ -14,6 +14,8 @@ import 'package:sanjay_roadlines_fleet/providers/auth_provider.dart';
 import 'package:sanjay_roadlines_fleet/repositories/auth_repository.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/user_id_generator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sanjay_roadlines_fleet/screens/admin/create_ticket_screen.dart' show driversProvider;
+import 'package:sanjay_roadlines_fleet/screens/admin/assigned_tickets_screen.dart' show reassignDriversProvider;
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 
 final allDriversProvider = FutureProvider<List<UserModel>>((ref) async {
@@ -38,266 +40,223 @@ class ManageDriversScreen extends ConsumerStatefulWidget {
 }
 
 class _ManageDriversScreenState extends ConsumerState<ManageDriversScreen> {
+  // Multi-select delete mode
+  bool _selectMode = false;
+  final Set<String> _selectedIds = {};
+
+  void _exitSelectMode() {
+    setState(() {
+      _selectMode = false;
+      _selectedIds.clear();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final driversAsync = ref.watch(allDriversProvider);
+    final drivers = driversAsync.value ?? const <UserModel>[];
+    final allSelected = drivers.isNotEmpty && _selectedIds.length == drivers.length;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Drivers'),
-      ),
-      body: driversAsync.when(
-        data: (drivers) {
-          if (drivers.isEmpty) {
-            return const Center(child: Text('No drivers found'));
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.only(bottom: 80),
-            itemCount: drivers.length,
-            itemBuilder: (context, index) {
-              final driver = drivers[index];
-              return Card(
-                child: ListTile(
-                  onTap: () => _showDriverDetails(driver),
-                  title: Text(driver.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(driver.userId, style: const TextStyle(color: AppColors.primaryDark, fontSize: 12)),
-                      Text(driver.mobile, style: const TextStyle(fontSize: 12)),
-                      // Show document status
-                      Row(
-                        children: [
-                          Icon(
-                            driver.drivingLicenseUrl != null ? Icons.check_circle : Icons.cancel,
-                            size: 12,
-                            color: driver.drivingLicenseUrl != null ? AppColors.successGreen : AppColors.errorRed,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            driver.drivingLicenseUrl != null ? 'License uploaded' : 'No license',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: driver.drivingLicenseUrl != null ? AppColors.successGreen : AppColors.errorRed,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Icon(
-                            driver.aadhaarCardUrl != null ? Icons.check_circle : Icons.cancel,
-                            size: 12,
-                            color: driver.aadhaarCardUrl != null ? AppColors.successGreen : AppColors.errorRed,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            driver.aadhaarCardUrl != null ? 'Aadhaar uploaded' : 'No Aadhaar',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: driver.aadhaarCardUrl != null ? AppColors.successGreen : AppColors.errorRed,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+    return PopScope(
+      canPop: !_selectMode,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _selectMode) _exitSelectMode();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: _selectMode
+              ? IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Cancel',
+                  onPressed: _exitSelectMode,
+                )
+              : null,
+          title: Text(_selectMode ? '${_selectedIds.length} selected' : 'Manage Drivers'),
+          actions: _selectMode
+              ? [
+                  IconButton(
+                    icon: Icon(allSelected ? Icons.deselect : Icons.select_all),
+                    tooltip: allSelected ? 'Clear selection' : 'Select all',
+                    onPressed: () => setState(() {
+                      if (allSelected) {
+                        _selectedIds.clear();
+                      } else {
+                        _selectedIds
+                          ..clear()
+                          ..addAll(drivers.map((d) => d.userId));
+                      }
+                    }),
                   ),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: driver.isActive ? AppColors.availableBg : AppColors.cancelledBg,
-                      borderRadius: BorderRadius.circular(20),
+                  IconButton(
+                    icon: const Icon(Icons.delete_forever),
+                    tooltip: 'Delete selected',
+                    onPressed: _selectedIds.isEmpty ? null : () => _confirmDeleteSelected(drivers),
+                  ),
+                ]
+              : [
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    tooltip: 'Add driver',
+                    onPressed: _showAddDriverSheet,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: 'Delete drivers',
+                    onPressed: drivers.isEmpty ? null : () => setState(() => _selectMode = true),
+                  ),
+                ],
+        ),
+        body: driversAsync.when(
+          data: (drivers) {
+            if (drivers.isEmpty) {
+              return const Center(child: Text('No drivers found. Tap + to add one.'));
+            }
+            return ListView.builder(
+              padding: const EdgeInsets.only(bottom: 24),
+              itemCount: drivers.length,
+              itemBuilder: (context, index) {
+                final driver = drivers[index];
+                final selected = _selectedIds.contains(driver.userId);
+                return Card(
+                  color: selected ? AppColors.primaryDark.withValues(alpha: 0.08) : null,
+                  child: ListTile(
+                    leading: _selectMode
+                        ? Checkbox(
+                            value: selected,
+                            onChanged: (_) => _toggleSelected(driver.userId),
+                          )
+                        : null,
+                    onTap: () => _selectMode ? _toggleSelected(driver.userId) : _showDriverDetails(driver),
+                    onLongPress: _selectMode
+                        ? null
+                        : () => setState(() {
+                              _selectMode = true;
+                              _selectedIds.add(driver.userId);
+                            }),
+                    title: Text(driver.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(driver.userId, style: const TextStyle(color: AppColors.primaryDark, fontSize: 12)),
+                        Text(driver.mobile, style: const TextStyle(fontSize: 12)),
+                        Row(
+                          children: [
+                            _docStatus(driver.drivingLicenseUrl != null, 'License uploaded', 'No license'),
+                            const SizedBox(width: 8),
+                            _docStatus(driver.aadhaarCardUrl != null, 'Aadhaar uploaded', 'No Aadhaar'),
+                          ],
+                        ),
+                      ],
                     ),
-                    child: Text(
-                      driver.isActive ? 'Active' : 'Inactive',
-                      style: TextStyle(
-                        color: driver.isActive ? AppColors.successGreen : AppColors.errorRed,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: driver.isActive ? AppColors.availableBg : AppColors.cancelledBg,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        driver.isActive ? 'Active' : 'Inactive',
+                        style: TextStyle(
+                          color: driver.isActive ? AppColors.successGreen : AppColors.errorRed,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Error: $e')),
+        ),
+      ),
+    );
+  }
+
+  Widget _docStatus(bool ok, String yes, String no) {
+    final color = ok ? AppColors.successGreen : AppColors.errorRed;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(ok ? Icons.check_circle : Icons.cancel, size: 12, color: color),
+        const SizedBox(width: 4),
+        Text(ok ? yes : no, style: TextStyle(fontSize: 10, color: color)),
+      ],
+    );
+  }
+
+  void _toggleSelected(String userId) {
+    setState(() {
+      if (!_selectedIds.remove(userId)) _selectedIds.add(userId);
+    });
+  }
+
+  /// Shows a driver document (licence / Aadhaar) full screen, with pinch-to-zoom.
+  void _openDocument(String title, String url) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog.fullscreen(
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: InteractiveViewer(
+                maxScale: 5,
+                child: Center(
+                  child: Image.network(
+                    // cache-buster so a re-uploaded document is not shown stale
+                    '$url${url.contains('?') ? '&' : '?'}t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}',
+                    fit: BoxFit.contain,
+                    loadingBuilder: (c, child, progress) => progress == null
+                        ? child
+                        : const CircularProgressIndicator(color: Colors.white),
+                    errorBuilder: (c, e, s) => const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Could not load this document. Check that the "driver-documents" storage bucket is public in Supabase.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white),
                       ),
                     ),
                   ),
                 ),
-              );
-            },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-      ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Remove All button
-          FloatingActionButton.extended(
-            onPressed: () => _showRemoveAllDriversDialog(),
-            label: const Text('Remove All', style: TextStyle(color: Colors.white)),
-            icon: const Icon(Icons.delete_sweep, color: Colors.white),
-            backgroundColor: AppColors.errorRed,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-          const SizedBox(height: 12),
-          // Add Driver button
-          FloatingActionButton.extended(
-            onPressed: () => _showAddDriverSheet(),
-            label: const Text(AppStrings.addDriver, style: TextStyle(color: Colors.white)),
-            icon: const Icon(Icons.person_add, color: Colors.white),
-            backgroundColor: AppColors.accentOrange,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        ],
+              ),
+            ),
+            SafeArea(
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 18)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  void _showDriverDetails(UserModel driver) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
-              const SizedBox(height: 24),
-              Text(driver.fullName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text(driver.userId, style: const TextStyle(color: AppColors.textSecondary)),
-              
-              // Show uploaded documents
-              if (driver.drivingLicenseUrl != null || driver.aadhaarCardUrl != null) ...[
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 8),
-                const Text('Uploaded Documents:', style: TextStyle(fontWeight: FontWeight.bold)),
-                if (driver.drivingLicenseUrl != null)
-                  ListTile(
-                    leading: const Icon(Icons.description, color: AppColors.primaryDark),
-                    title: const Text('Driving License'),
-                    trailing: const Icon(Icons.open_in_new),
-                    onTap: () {
-                      // Open document URL
-                    },
-                  ),
-                if (driver.aadhaarCardUrl != null)
-                  ListTile(
-                    leading: const Icon(Icons.credit_card, color: AppColors.primaryDark),
-                    title: const Text('Aadhaar Card'),
-                    trailing: const Icon(Icons.open_in_new),
-                    onTap: () {
-                      // Open document URL
-                    },
-                  ),
-              ],
-              
-              const SizedBox(height: 32),
-              AppButton(
-                text: AppStrings.resetMpin,
-                isOutlined: true,
-                onPressed: () async {
-                  final scaffoldMessenger = ScaffoldMessenger.of(this.context);
-                  final navigator = Navigator.of(this.context);
-                  await AuthRepository().resetMpin(driver.userId);
-                  if (mounted) {
-                    navigator.pop();
-                    scaffoldMessenger.showSnackBar(
-                      const SnackBar(content: Text('Driver MPIN reset. They must login with mobile number.'), backgroundColor: AppColors.successGreen),
-                    );
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              AppButton(
-                text: driver.isActive ? 'DEACTIVATE DRIVER' : 'ACTIVATE DRIVER',
-                backgroundColor: driver.isActive ? AppColors.errorRed : AppColors.successGreen,
-                onPressed: () async {
-                  final navigator = Navigator.of(this.context);
-                  await Supabase.instance.client
-                      .from(SupabaseConstants.tableUsers)
-                      .update({'is_active': !driver.isActive})
-                      .eq('user_id', driver.userId);
-                  ref.invalidate(allDriversProvider);
-                  if (mounted) navigator.pop();
-                },
-              ),
-              const SizedBox(height: 12),
-              // Remove Driver
-              AppButton(
-                text: 'REMOVE DRIVER',
-                backgroundColor: AppColors.errorRed,
-                onPressed: () async {
-                  final scaffoldMessenger = ScaffoldMessenger.of(this.context);
-                  final navigator = Navigator.of(this.context);
-
-                  final confirm = await showDialog<bool>(
-                    context: this.context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Remove Driver'),
-                      content: Text('Are you sure you want to permanently remove ${driver.fullName}? This cannot be undone.'),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('Remove', style: TextStyle(color: AppColors.errorRed)),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirm != true || !mounted) return;
-
-                  try {
-                    // Delete storage files if they exist
-                    final storage = Supabase.instance.client.storage;
-                    if (driver.drivingLicenseUrl != null) {
-                      await storage.from(SupabaseConstants.bucketDriverDocuments).remove([
-                        '${driver.companyCode}/${driver.userId}/license.jpg',
-                      ]);
-                    }
-                    if (driver.aadhaarCardUrl != null) {
-                      await storage.from(SupabaseConstants.bucketDriverDocuments).remove([
-                        '${driver.companyCode}/${driver.userId}/aadhaar.jpg',
-                      ]);
-                    }
-                    // Delete user record
-                    await Supabase.instance.client
-                        .from(SupabaseConstants.tableUsers)
-                        .delete()
-                        .eq('user_id', driver.userId);
-                    ref.invalidate(allDriversProvider);
-                    if (mounted) {
-                      navigator.pop();
-                      scaffoldMessenger.showSnackBar(
-                        SnackBar(content: Text('${driver.fullName} has been removed'), backgroundColor: AppColors.successGreen),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      scaffoldMessenger.showSnackBar(
-                        SnackBar(content: Text('Failed to remove driver: $e'), backgroundColor: AppColors.errorRed),
-                      );
-                    }
-                  }
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showRemoveAllDriversDialog() async {
-    final user = ref.read(authStateProvider).value;
-    if (user == null) return;
-
-    final driversAsync = ref.read(allDriversProvider);
-    final count = driversAsync.maybeWhen(data: (d) => d.length, orElse: () => 0);
-
-    if (count == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No drivers to remove'), backgroundColor: AppColors.errorRed),
-      );
-      return;
+  /// Deletes the driver's uploaded documents (best effort) and their user record.
+  Future<void> _deleteDriverFiles(UserModel driver) async {
+    final storage = Supabase.instance.client.storage;
+    try {
+      await storage.from(SupabaseConstants.bucketDriverDocuments).remove([
+        '${driver.companyCode}/${driver.userId}/license.jpg',
+        '${driver.companyCode}/${driver.userId}/aadhaar.jpg',
+      ]);
+    } catch (_) {
+      // Continue even if storage delete fails
     }
+  }
+
+  Future<void> _confirmDeleteSelected(List<UserModel> drivers) async {
+    final toDelete = drivers.where((d) => _selectedIds.contains(d.userId)).toList();
+    if (toDelete.isEmpty) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -307,18 +266,35 @@ class _ManageDriversScreenState extends ConsumerState<ManageDriversScreen> {
           children: [
             Icon(Icons.warning_amber_rounded, color: AppColors.errorRed),
             SizedBox(width: 8),
-            Text('Remove All Drivers'),
+            Expanded(child: Text('Delete permanently?')),
           ],
         ),
-        content: Text(
-          'Are you sure you want to permanently remove all $count drivers?\n\nThis will also delete their documents. This action cannot be undone.',
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                toDelete.length == 1
+                    ? 'This driver and their documents will be permanently deleted:'
+                    : 'These ${toDelete.length} drivers and their documents will be permanently deleted:',
+              ),
+              const SizedBox(height: 12),
+              ...toDelete.map((d) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text('• ${d.fullName} (${d.userId})', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  )),
+              const SizedBox(height: 12),
+              const Text('This cannot be undone.', style: TextStyle(color: AppColors.errorRed)),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
-            child: const Text('Remove All'),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed, foregroundColor: Colors.white),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -326,60 +302,122 @@ class _ManageDriversScreenState extends ConsumerState<ManageDriversScreen> {
 
     if (confirmed != true || !mounted) return;
 
-    // Show loading
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
-      );
-    }
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
 
     try {
-      // Get all drivers to delete their storage files
-      final drivers = driversAsync.value ?? [];
-      final storage = Supabase.instance.client.storage;
-
-      for (final driver in drivers) {
-        try {
-          if (driver.drivingLicenseUrl != null) {
-            await storage.from(SupabaseConstants.bucketDriverDocuments).remove([
-              '${driver.companyCode}/${driver.userId}/license.jpg',
-            ]);
-          }
-          if (driver.aadhaarCardUrl != null) {
-            await storage.from(SupabaseConstants.bucketDriverDocuments).remove([
-              '${driver.companyCode}/${driver.userId}/aadhaar.jpg',
-            ]);
-          }
-        } catch (_) {
-          // Continue even if storage delete fails
-        }
+      for (final driver in toDelete) {
+        await _deleteDriverFiles(driver);
       }
-
-      // Delete all driver records
       await Supabase.instance.client
           .from(SupabaseConstants.tableUsers)
           .delete()
-          .eq('company_code', user.companyCode)
+          .inFilter('user_id', toDelete.map((d) => d.userId).toList())
           .eq('role', 'driver');
 
       ref.invalidate(allDriversProvider);
-
-      if (mounted) {
-        Navigator.pop(context); // dismiss loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('All $count drivers removed'), backgroundColor: AppColors.successGreen),
-        );
-      }
+      navigator.pop(); // dismiss loading
+      _exitSelectMode();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(toDelete.length == 1
+              ? '${toDelete.first.fullName} has been deleted'
+              : '${toDelete.length} drivers deleted'),
+          backgroundColor: AppColors.successGreen,
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // dismiss loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.errorRed),
-        );
-      }
+      navigator.pop(); // dismiss loading
+      messenger.showSnackBar(
+        SnackBar(content: Text('Failed to delete: $e'), backgroundColor: AppColors.errorRed),
+      );
     }
+  }
+
+  void _showDriverDetails(UserModel driver) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+                const SizedBox(height: 24),
+                Text(driver.fullName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text(driver.userId, style: const TextStyle(color: AppColors.textSecondary)),
+
+                // Uploaded documents
+                if (driver.drivingLicenseUrl != null || driver.aadhaarCardUrl != null) ...[
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  const Text('Uploaded Documents:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  if (driver.drivingLicenseUrl != null)
+                    ListTile(
+                      leading: const Icon(Icons.description, color: AppColors.primaryDark),
+                      title: const Text('Driving License'),
+                      trailing: const Icon(Icons.open_in_new),
+                      onTap: () => _openDocument('Driving License', driver.drivingLicenseUrl!),
+                    ),
+                  if (driver.aadhaarCardUrl != null)
+                    ListTile(
+                      leading: const Icon(Icons.credit_card, color: AppColors.primaryDark),
+                      title: const Text('Aadhaar Card'),
+                      trailing: const Icon(Icons.open_in_new),
+                      onTap: () => _openDocument('Aadhaar Card', driver.aadhaarCardUrl!),
+                    ),
+                ],
+
+                const SizedBox(height: 32),
+                AppButton(
+                  text: AppStrings.resetMpin,
+                  isOutlined: true,
+                  onPressed: () async {
+                    final scaffoldMessenger = ScaffoldMessenger.of(this.context);
+                    final navigator = Navigator.of(this.context);
+                    await AuthRepository().resetMpin(driver.userId);
+                    if (mounted) {
+                      navigator.pop();
+                      scaffoldMessenger.showSnackBar(
+                        const SnackBar(content: Text('Driver MPIN reset. They must login with mobile number.'), backgroundColor: AppColors.successGreen),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                AppButton(
+                  text: driver.isActive ? 'DEACTIVATE DRIVER' : 'ACTIVATE DRIVER',
+                  backgroundColor: driver.isActive ? AppColors.errorRed : AppColors.successGreen,
+                  onPressed: () async {
+                    final navigator = Navigator.of(this.context);
+                    await Supabase.instance.client
+                        .from(SupabaseConstants.tableUsers)
+                        .update({'is_active': !driver.isActive})
+                        .eq('user_id', driver.userId);
+                    // Refresh every driver list so the change shows everywhere at once
+                    ref.invalidate(allDriversProvider);
+                    ref.invalidate(driversProvider);
+                    ref.invalidate(reassignDriversProvider);
+                    if (mounted) navigator.pop();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showAddDriverSheet() {

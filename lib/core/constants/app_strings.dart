@@ -1,6 +1,6 @@
 class AppStrings {
   // App
-  static const String appName = 'Sanjay Roadlines';
+  static const String appName = 'Chakka Saarthi';
   static const String fleetManagement = 'Fleet Management';
 
   // Auth

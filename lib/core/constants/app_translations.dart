@@ -6,7 +6,7 @@ class AppTranslations {
   static const Map<String, Map<String, String>> _translations = {
     'en': {
       // General
-      'appName': 'Sanjay Roadlines',
+      'appName': 'Chakka Saarthi',
       'fleetManagement': 'Fleet Management',
       'loading': 'Loading...',
       'error': 'Error',
@@ -165,7 +165,7 @@ class AppTranslations {
     },
     'hi': {
       // General
-      'appName': 'संजय रोडलाइन्स',
+      'appName': 'चक्का सारथी',
       'fleetManagement': 'फ्लीट प्रबंधन',
       'loading': 'लोड हो रहा है...',
       'error': 'त्रुटि',
@@ -324,7 +324,7 @@ class AppTranslations {
     },
     'mr': {
       // General
-      'appName': 'संजय रोडलाइन्स',
+      'appName': 'चक्का सारथी',
       'fleetManagement': 'फ्लीट व्यवस्थापन',
       'loading': 'लोड होत आहे...',
       'error': 'त्रुटी',

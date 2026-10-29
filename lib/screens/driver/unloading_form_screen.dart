@@ -13,6 +13,8 @@ import 'package:sanjay_roadlines_fleet/repositories/loading_unloading_repository
 import 'package:sanjay_roadlines_fleet/core/utils/local_notification_service.dart';
 import 'package:sanjay_roadlines_fleet/repositories/notification_repository.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
+import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
+import 'package:sanjay_roadlines_fleet/core/constants/app_strings.dart';
 import 'package:image_picker/image_picker.dart';
 
 class UnloadingFormScreen extends ConsumerStatefulWidget {
@@ -260,7 +262,7 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
           ),
           loading: loading,
           unloading: unloadingStatus,
-          companyName: 'Sanjay Roadlines',
+          companyName: ref.read(businessNameProvider).value ?? AppStrings.appName,
         );
       } catch (_) {
         pdfBytes = Uint8List(0);

@@ -11,6 +11,7 @@ import 'package:sanjay_roadlines_fleet/providers/notification_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/ticket_provider.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/local_notification_service.dart';
 import 'package:sanjay_roadlines_fleet/repositories/auth_repository.dart';
+import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class DriverDashboard extends ConsumerStatefulWidget {
@@ -106,7 +107,8 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
       appBar: AppBar(
         backgroundColor: AppColors.primaryDark,
         foregroundColor: Colors.white,
-        title: Text(_tr('appName'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        titleSpacing: 12,
+        title: const BusinessAppBarTitle(),
         actions: [
           IconButton(
             icon: const Icon(Icons.language, color: Colors.white, size: 22),

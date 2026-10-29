@@ -10,6 +10,7 @@ import 'package:sanjay_roadlines_fleet/models/ticket_model.dart';
 import 'package:sanjay_roadlines_fleet/providers/ticket_provider.dart';
 import 'package:sanjay_roadlines_fleet/repositories/loading_unloading_repository.dart';
 import 'package:sanjay_roadlines_fleet/repositories/ticket_repository.dart';
+import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class CompletedTripsScreen extends ConsumerStatefulWidget {
@@ -473,7 +474,7 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
         ticket: ticket,
         loading: loading,
         unloading: unloading,
-        companyName: 'Sanjay Roadlines',
+        companyName: ref.read(businessNameProvider).value ?? AppStrings.appName,
       );
 
       await Printing.layoutPdf(
