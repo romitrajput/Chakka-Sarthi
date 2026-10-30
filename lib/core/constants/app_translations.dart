@@ -46,7 +46,7 @@ class AppTranslations {
       'maintenance': 'Maintenance',
       'dashboard': 'Dashboard',
       'manageDrivers': 'Manage Drivers',
-      'assignedTickets': 'Assigned Tickets',
+      'assignedTickets': 'Assigned Trips',
       'notifications': 'Notifications',
       
       // Stats
@@ -80,7 +80,7 @@ class AppTranslations {
       'assignTicket': 'ASSIGN TICKET',
       'selectDriver': 'Select Driver',
       'assignVehicleDriver': 'Assign Vehicle & Driver',
-      'ticketAssigned': 'Ticket Assigned Successfully',
+      'ticketAssigned': 'Trip Assigned Successfully',
       'driverAlreadyActive': 'Driver already has an active trip',
       'vehicleNotAvailable': 'Vehicle is not available',
       
@@ -205,7 +205,7 @@ class AppTranslations {
       'maintenance': 'रखरखाव',
       'dashboard': 'डैशबोर्ड',
       'manageDrivers': 'चालक प्रबंधन',
-      'assignedTickets': 'सौंपे गए टिकट',
+      'assignedTickets': 'सौंपी गई यात्राएं',
       'notifications': 'सूचनाएं',
       
       // Stats
@@ -236,10 +236,10 @@ class AppTranslations {
       'noMaintenanceVehicles': 'रखरखाव में कोई वाहन नहीं',
       
       // Trip
-      'assignTicket': 'टिकट सौंपें',
+      'assignTicket': 'यात्रा सौंपें',
       'selectDriver': 'चालक चुनें',
       'assignVehicleDriver': 'वाहन और चालक सौंपें',
-      'ticketAssigned': 'टिकट सफलतापूर्वक सौंपा गया',
+      'ticketAssigned': 'यात्रा सफलतापूर्वक सौंपा गया',
       'driverAlreadyActive': 'चालक के पास पहले से एक सक्रिय यात्रा है',
       'vehicleNotAvailable': 'वाहन उपलब्ध नहीं है',
       
@@ -490,15 +490,18 @@ class AppTranslations {
   }
 
   /// Save language preference
-  static Future<void> saveLanguage(String languageCode) async {
+  /// Language is saved per person, so a driver choosing Hindi
+  /// does not change the language for the admin on the same phone.
+  static Future<void> saveLanguage(String languageCode, {String? userId}) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('app_language', languageCode);
+    await prefs.setString(userId == null ? 'app_language' : 'app_language_$userId', languageCode);
   }
 
-  /// Load saved language preference
-  static Future<String> loadLanguage() async {
+  /// Load saved language preference (English if this person never chose one)
+  static Future<String> loadLanguage({String? userId}) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('app_language') ?? 'en';
+    if (userId == null) return 'en';
+    return prefs.getString('app_language_$userId') ?? 'en';
   }
 
   /// Get Locale from saved preference

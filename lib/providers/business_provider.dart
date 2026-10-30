@@ -62,11 +62,15 @@ Future<String> currentBusinessName(WidgetRef ref) async {
 }
 
 /// Saves the business name for the admin's company and refreshes it everywhere.
-Future<void> saveBusinessName(WidgetRef ref, String companyCode, String name) async {
+Future<void> saveBusinessName(WidgetRef ref, String companyCode, String name, {String? shortCode}) async {
   final clean = name.trim();
+  final code = shortCode?.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
   await Supabase.instance.client
       .from(SupabaseConstants.tableCompanies)
-      .update({'company_name': clean})
+      .update({
+        'company_name': clean,
+        if (code != null && code.isNotEmpty) 'short_name': code,
+      })
       .eq('company_code', companyCode);
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString(_businessNamePrefsKey, clean);
@@ -86,10 +90,22 @@ Future<String?> showBusinessNameDialog(
   if (user == null || user.role != 'admin') return null;
 
   final controller = TextEditingController(text: current ?? '');
+  // Short code used at the start of Trip IDs and Driver IDs (e.g. SRL)
+  String currentCode = '';
+  try {
+    final row = await Supabase.instance.client
+        .from(SupabaseConstants.tableCompanies)
+        .select('short_name')
+        .eq('company_code', user.companyCode)
+        .maybeSingle();
+    currentCode = (row?['short_name'] as String?) ?? '';
+  } catch (_) {}
+  final codeController = TextEditingController(text: currentCode);
   final formKey = GlobalKey<FormState>();
   bool saving = false;
   String? error;
 
+  if (!context.mounted) return null;
   final result = await showDialog<String>(
     context: context,
     barrierDismissible: !required,
@@ -128,6 +144,23 @@ Future<String?> showBusinessNameDialog(
                     return null;
                   },
                 ),
+                const SizedBox(height: 4),
+                TextFormField(
+                  controller: codeController,
+                  maxLength: 5,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(
+                    labelText: 'Short code',
+                    hintText: 'e.g. SRL',
+                    helperText: 'Starts every new Trip ID and Driver ID',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) {
+                    final c = (v ?? '').toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+                    if (c.length < 2) return 'Use 2–5 letters, e.g. SRL';
+                    return null;
+                  },
+                ),
                 if (error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -152,7 +185,8 @@ Future<String?> showBusinessNameDialog(
                         error = null;
                       });
                       try {
-                        await saveBusinessName(ref, user.companyCode, controller.text);
+                        await saveBusinessName(ref, user.companyCode, controller.text,
+                            shortCode: codeController.text);
                         if (ctx.mounted) Navigator.pop(ctx, controller.text.trim());
                       } catch (e) {
                         setState(() {

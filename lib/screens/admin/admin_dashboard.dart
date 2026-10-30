@@ -30,7 +30,11 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     Future.delayed(const Duration(seconds: 6), () {
       if (mounted) setState(() => _showWelcome = false);
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _askBusinessNameIfMissing());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // The admin side is always English, whatever a driver chose on this phone
+      ref.read(languageProvider.notifier).state = const Locale('en');
+      _askBusinessNameIfMissing();
+    });
   }
 
   /// First time an admin opens the app, ask for the business name.
@@ -62,11 +66,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     // Data
     final ticketState = ref.watch(ticketStateProvider);
     final vehicleState = ref.watch(vehicleStateProvider);
+    // On a trip = assigned (waiting to load) or already loaded and moving
     final inTransitCount = ticketState.maybeWhen(
-      data: (tickets) => tickets.where((t) => t.status == 'in_transit').length,
+      data: (tickets) => tickets.where((t) => t.status == 'assigned' || t.status == 'in_transit').length,
       orElse: () => 0,
     );
-    final completedTodayCount = ticketState.maybeWhen(
+    final completedTodayCount = ref.watch(completedTicketsProvider).maybeWhen(
       data: (tickets) {
         final now = DateTime.now();
         return tickets.where((t) =>
@@ -130,7 +135,15 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     int assignedCount,
   ) {
     final expiring = ref.watch(expiringLicencesProvider).value ?? const <UserModel>[];
-    return SingleChildScrollView(
+    return RefreshIndicator(
+      color: AppColors.ink,
+      onRefresh: () async {
+        ref.invalidate(ticketStateProvider);
+        ref.invalidate(vehicleStateProvider);
+        ref.invalidate(completedTicketsProvider);
+        ref.invalidate(expiringLicencesProvider);
+      },
+      child: SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,6 +468,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           const SizedBox(height: 24),
         ],
       ),
+    ),
     );
   }
 
@@ -673,7 +687,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
               ref.read(authStateProvider.notifier).logout();
               context.go('/login');
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed,
+                foregroundColor: Colors.white,),
             child: const Text('Logout'),
           ),
         ],

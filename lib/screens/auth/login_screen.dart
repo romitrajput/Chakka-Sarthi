@@ -19,7 +19,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _userIdController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isMpinMode = false;
+  bool _isMpinMode = true; // true: ID/mobile + MPIN. false: first-time login (User ID + mobile)
+  bool _obscureUserId = true;
   bool _rememberMe = false;
   bool _obscurePassword = true;
   bool _isLoggingIn = false;
@@ -422,19 +423,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         SizedBox(height: screenH * 0.018),
 
                         // User ID
-                        _buildLabel('User ID'),
+                        _buildLabel(_isMpinMode ? 'User ID or Mobile Number' : 'User ID'),
                         SizedBox(height: screenH * 0.006),
                         TextFormField(
                           controller: _userIdController,
                           textCapitalization: TextCapitalization.characters,
+                          obscureText: _obscureUserId,
+                          enableSuggestions: false,
+                          autocorrect: false,
                           style: TextStyle(
                               fontSize: screenW * 0.035, letterSpacing: 1),
                           decoration: _inputDecoration(
-                            'e.g. MH010002ADSRL0001',
+                            _isMpinMode ? 'Enter User ID or mobile number' : 'Enter your User ID',
                             Icons.person_outline,
+                          ).copyWith(
+                            suffixIcon: IconButton(
+                              tooltip: _obscureUserId ? 'Show' : 'Hide',
+                              icon: Icon(
+                                _obscureUserId
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: AppColors.textSecondary,
+                                size: 20,
+                              ),
+                              onPressed: () => setState(() => _obscureUserId = !_obscureUserId),
+                            ),
                           ),
                           validator: (v) => v == null || v.isEmpty
-                              ? 'User ID is required'
+                              ? (_isMpinMode ? 'Enter your User ID or mobile number' : 'User ID is required')
                               : null,
                         ),
                         SizedBox(height: screenH * 0.014),
@@ -611,13 +627,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.fingerprint,
-                                    size: screenW * 0.06),
-                                SizedBox(width: screenW * 0.025),
                                 Text(
                                   _isMpinMode
-                                      ? 'Login with Mobile Number'
-                                      : 'Login with MPIN',
+                                      ? 'First time? Set up your MPIN'
+                                      : 'Back to MPIN login',
                                   style: TextStyle(
                                     fontSize: screenW * 0.038,
                                     fontWeight: FontWeight.w600,
@@ -631,8 +644,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         Center(
                           child: Text(
                             _isMpinMode
-                                ? 'Login using your registered mobile number'
-                                : 'Already have MPIN? Login with MPIN',
+                                ? 'New user: log in once with User ID + mobile number'
+                                : 'Already have an MPIN? Go back to MPIN login',
                             style: TextStyle(
                               fontSize: screenW * 0.03,
                               color: Colors.grey.shade500,

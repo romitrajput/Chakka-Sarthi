@@ -435,7 +435,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
         final unloading = await loadingRepo.getUnloadingStatus(ticket.ticketId);
         if (unloading != null && unloading.shortageKgs > 0) {
           shortageData.add({
-            'ticket': ticket,
+            'trip': ticket,
             'shortage': unloading.shortageKgs,
           });
         }
@@ -470,7 +470,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
                           itemCount: shortageData.length,
                           itemBuilder: (context, index) {
                             final data = shortageData[index];
-                            final ticket = data['ticket'] as TicketModel;
+                            final ticket = data['trip'] as TicketModel;
                             final shortage = data['shortage'] as double;
                             return ListTile(
                               leading: const Icon(Icons.warning_amber_rounded, color: AppColors.errorRed),
@@ -616,7 +616,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildDetailRow('Driver', driverNameOf(ref, t.driverUserId)),
+                                _buildDetailRow('Completed by', driverNameOf(ref, t.driverUserId)),
                                 _buildDetailRow('Status', t.status.toUpperCase()),
                                 if (t.completedAt != null)
                                   _buildDetailRow('Completed', t.formattedCompletedAt),
@@ -715,7 +715,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
           ),
           const SizedBox(height: 8),
           Text(
-            'Select a date range and vehicle to generate a consolidated PDF report.',
+            'Pick a date range and a vehicle, or Export All for every vehicle. Download as PDF or Excel.',
             style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 16),
@@ -729,9 +729,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
                   border: OutlineInputBorder(),
                 ),
                 initialValue: _selectedVehicleNumber,
-                items: vehicles.map((v) {
-                  return DropdownMenuItem(value: v, child: Text(v));
-                }).toList(),
+                items: [
+                  const DropdownMenuItem(
+                    value: _allVehiclesKey,
+                    child: Text('Export All (every vehicle)', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                  ...vehicles.map((v) => DropdownMenuItem(value: v, child: Text(v))),
+                ],
                 onChanged: (value) {
                   setState(() => _selectedVehicleNumber = value);
                 },
@@ -790,15 +794,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
     final toDate = _toDate ?? DateTime.now();
     setState(() => _exportingExcel = true);
     try {
-      final report = await ref.read(reportRepositoryProvider).getVehicleMonthlyReport(
-            vehicleNumber: _selectedVehicleNumber!,
-            companyCode: ref.read(authStateProvider).value!.companyCode,
-            fromDate: fromDate,
-            toDate: toDate,
-          );
-      final trips = report['tripDetails'] == null
-          ? <Map<String, dynamic>>[]
-          : List<Map<String, dynamic>>.from(report['tripDetails']);
+      final trips = await _loadExportTrips(fromDate, toDate);
       if (trips.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -810,7 +806,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
       }
       await ExcelExporter.shareVehicleReport(
         businessName: await currentBusinessName(ref),
-        vehicleNumber: _selectedVehicleNumber!,
+        vehicleNumber: _isAllVehicles ? 'All vehicles' : _selectedVehicleNumber!,
         fromDate: fromDate,
         toDate: toDate,
         trips: trips,
@@ -826,6 +822,27 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
     }
   }
 
+  static const String _allVehiclesKey = '__ALL_VEHICLES__';
+  bool get _isAllVehicles => _selectedVehicleNumber == _allVehiclesKey;
+
+  /// Trips for the chosen vehicle, or for every vehicle when "Export All" is chosen.
+  Future<List<Map<String, dynamic>>> _loadExportTrips(DateTime fromDate, DateTime toDate) async {
+    final repo = ref.read(reportRepositoryProvider);
+    final companyCode = ref.read(authStateProvider).value!.companyCode;
+    if (_isAllVehicles) {
+      final vehicles = await ref.read(allVehicleNumbersProvider.future);
+      return repo.getAllVehiclesTrips(
+          vehicleNumbers: vehicles, companyCode: companyCode, fromDate: fromDate, toDate: toDate);
+    }
+    final report = await repo.getVehicleMonthlyReport(
+      vehicleNumber: _selectedVehicleNumber!,
+      companyCode: companyCode,
+      fromDate: fromDate,
+      toDate: toDate,
+    );
+    return report['tripDetails'] == null ? [] : List<Map<String, dynamic>>.from(report['tripDetails']);
+  }
+
   Future<void> _exportReport() async {
     if (_selectedVehicleNumber == null) return;
 
@@ -833,34 +850,28 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
     final toDate = _toDate ?? DateTime.now();
 
     try {
-      final reportRepo = ref.read(reportRepositoryProvider);
-      final report = await reportRepo.getVehicleMonthlyReport(
-        vehicleNumber: _selectedVehicleNumber!,
-        companyCode: ref.read(authStateProvider).value!.companyCode,
-        fromDate: fromDate,
-        toDate: toDate,
-      );
-
-      if (report.isEmpty || report['tripDetails'] == null) {
+      final trips = await _loadExportTrips(fromDate, toDate);
+      if (trips.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No trips found for this vehicle in the selected period'), backgroundColor: AppColors.errorRed),
+            const SnackBar(content: Text('No completed trips found in the selected period'), backgroundColor: AppColors.errorRed),
           );
         }
         return;
       }
 
       final pdfBytes = await PdfGenerator.generateConsolidatedReport(
-        vehicleNumber: _selectedVehicleNumber!,
-        tripDetails: List<Map<String, dynamic>>.from(report['tripDetails']),
+        vehicleNumber: _isAllVehicles ? 'All vehicles' : _selectedVehicleNumber!,
+        tripDetails: trips,
         companyName: await currentBusinessName(ref),
         fromDate: fromDate,
         toDate: toDate,
+        allVehicles: _isAllVehicles,
       );
 
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdfBytes,
-        name: 'Export_Report_${_selectedVehicleNumber}_${DateFormat('MMM_yyyy').format(fromDate)}',
+        name: 'Export_Report_${_isAllVehicles ? 'All_Vehicles' : _selectedVehicleNumber}_${DateFormat('MMM_yyyy').format(fromDate)}',
       );
     } catch (e) {
       if (mounted) {

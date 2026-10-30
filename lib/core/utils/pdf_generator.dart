@@ -130,6 +130,8 @@ class PdfGenerator {
     required LoadingStatusModel loading,
     required UnloadingStatusModel unloading,
     required String companyName,
+    String? unloadedBy,
+    List<String> driverChanges = const [],
   }) async {
     final pdf = pw.Document();
     final font = await PdfGoogleFonts.robotoRegular();
@@ -169,7 +171,9 @@ class PdfGenerator {
               _buildTable([
                 ['Trip ID', ticket.ticketId],
                 ['Assigned Date', ticket.formattedAssignedAt],
-                ['Driver Name', loading.driverName],
+                ['Loaded by (driver)', loading.driverName],
+                ['Unloaded by (driver)', unloadedBy ?? loading.driverName],
+                if (driverChanges.isNotEmpty) ['Driver changes', driverChanges.join('\n')],
                 ['Vehicle Number', loading.vehicleNumber],
                 ['Assigned By', ticket.createdBy],
               ], font, boldFont),
@@ -234,6 +238,7 @@ class PdfGenerator {
     required String vehicleNumber,
     required List<Map<String, dynamic>> tripDetails,
     required String companyName,
+    bool allVehicles = false,
     required DateTime fromDate,
     required DateTime toDate,
   }) async {
@@ -274,7 +279,7 @@ class PdfGenerator {
               pw.SizedBox(height: 30),
               _buildSectionHeader('REPORT SUMMARY', boldFont),
               _buildTable([
-                ['Vehicle Number', vehicleNumber],
+                [allVehicles ? 'Vehicles' : 'Vehicle Number', vehicleNumber],
                 ['Report Period', '${DateFormat('dd MMM yyyy').format(fromDate)} to ${DateFormat('dd MMM yyyy').format(toDate)}'],
                 ['Total Trips', '${tripDetails.length}'],
                 ['Total Loading (Kgs)', totalLoading.toStringAsFixed(2)],
@@ -307,7 +312,7 @@ class PdfGenerator {
                 cellAlignment: pw.Alignment.centerLeft,
                 headerAlignment: pw.Alignment.centerLeft,
                 cellHeight: 24,
-                headers: ['#', 'Trip ID', 'Driver', 'Assigned', 'Completed', 'Loading (kg)', 'Unloading (kg)', 'Shortage (kg)', 'Detention'],
+                headers: ['#', 'Trip ID', if (allVehicles) 'Vehicle', 'Driver', 'Assigned', 'Completed', 'Loading (kg)', 'Unloading (kg)', 'Shortage (kg)', 'Detention'],
                 data: tripDetails.asMap().entries.map((entry) {
                   final i = entry.key + 1;
                   final t = entry.value;
@@ -344,6 +349,7 @@ class PdfGenerator {
                   return [
                     '$i',
                     (t['ticketId'] as String?) ?? '',
+                    if (allVehicles) (t['vehicleNumber'] as String?) ?? '',
                     (t['driverName'] as String?) ?? (t['driverUserId'] as String?) ?? '',
                     assignedStr,
                     completedStr,
@@ -390,8 +396,11 @@ class PdfGenerator {
                 _buildSectionHeader('TRIP DETAILS', boldFont),
                 _buildTable([
                   ['Trip ID', trip['ticketId'] as String? ?? ''],
-                  ['Vehicle', vehicleNumber],
-                  ['Driver', trip['driverName'] as String? ?? trip['driverUserId'] as String? ?? ''],
+                  ['Vehicle', (trip['vehicleNumber'] as String?) ?? vehicleNumber],
+                  ['Loaded by (driver)', (trip['loadedBy'] as String?) ?? (trip['driverName'] as String?) ?? ''],
+                  ['Unloaded by (driver)', (trip['unloadedBy'] as String?) ?? (trip['driverName'] as String?) ?? ''],
+                  if ((trip['driverChanges'] as List?)?.isNotEmpty ?? false)
+                    ['Driver changes', (trip['driverChanges'] as List).join('\n')],
                   ['Assigned By', trip['createdBy'] as String? ?? ''],
                   ['Assigned At', _dateTime(trip['assignedAt'])],
                   ['Completed At', _dateTime(trip['completedAt'])],
@@ -450,7 +459,7 @@ class PdfGenerator {
               _buildSectionHeader('CONSOLIDATED SUMMARY', boldFont),
               pw.SizedBox(height: 10),
               _buildTable([
-                ['Vehicle Number', vehicleNumber],
+                [allVehicles ? 'Vehicles' : 'Vehicle Number', vehicleNumber],
                 ['Report Period', '${DateFormat('dd MMM yyyy').format(fromDate)} to ${DateFormat('dd MMM yyyy').format(toDate)}'],
                 ['Total Trips Completed', '${tripDetails.length}'],
                 ['Total Loading (Kgs)', totalLoading.toStringAsFixed(2)],

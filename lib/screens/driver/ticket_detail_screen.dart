@@ -11,12 +11,12 @@ import 'package:sanjay_roadlines_fleet/repositories/loading_unloading_repository
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 final ticketDetailProvider =
-    FutureProvider.family<TicketModel, String>((ref, ticketId) async {
+    FutureProvider.autoDispose.family<TicketModel, String>((ref, ticketId) async {
   return ref.watch(ticketRepositoryProvider).getTicketById(ticketId);
 });
 
 final loadingStatusProvider =
-    FutureProvider.family<LoadingStatusModel?, String>((ref, ticketId) async {
+    FutureProvider.autoDispose.family<LoadingStatusModel?, String>((ref, ticketId) async {
   return LoadingUnloadingRepository().getLoadingStatus(ticketId);
 });
 
@@ -44,6 +44,35 @@ class TicketDetailScreen extends ConsumerWidget {
       ),
       body: ticketAsync.when(
         data: (ticket) {
+          // Trip moved to another driver: nothing more can be done on it here
+          if (user != null && user.role != 'admin' && ticket.driverUserId != user.userId) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.swap_horiz, size: 48, color: AppColors.textSecondary),
+                    const SizedBox(height: 12),
+                    const Text('This trip has been re-assigned to another driver.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    const Text('You no longer need to do anything on it.',
+                        textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () {
+                        ref.invalidate(ticketStateProvider);
+                        Navigator.of(context).maybePop();
+                      },
+                      child: const Text('Back'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
           final vehicleAsync =
               ref.watch(vehicleNumberDetailProvider(ticket.vehicleId));
 
@@ -220,7 +249,7 @@ class TicketDetailScreen extends ConsumerWidget {
         loading: () =>
             const Center(child: CircularProgressIndicator()),
         error: (e, _) =>
-            Center(child: Text('Error loading ticket: $e')),
+            Center(child: Text('Error loading trip: $e')),
       ),
     );
   }
@@ -322,7 +351,8 @@ class TicketDetailScreen extends ConsumerWidget {
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
             style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryDark),
+                backgroundColor: AppColors.brandYellow,
+                foregroundColor: AppColors.onBrandYellow,),
             child: const Text('OK'),
           ),
         ],

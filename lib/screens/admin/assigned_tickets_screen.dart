@@ -93,7 +93,7 @@ class _AdminAssignedTicketsScreenState
                             color: AppColors.textSecondary.withValues(alpha: 0.5)),
                         const SizedBox(height: 16),
                         const Text(
-                          'No active tickets',
+                          'No active trips',
                           style: TextStyle(
                               fontSize: 16,
                               color: AppColors.textSecondary,
@@ -101,7 +101,7 @@ class _AdminAssignedTicketsScreenState
                         ),
                         const SizedBox(height: 6),
                         const Text(
-                          'Tickets appear here when assigned or in transit',
+                          'Trips appear here when assigned or in transit',
                           style: TextStyle(
                               fontSize: 12, color: AppColors.textSecondary),
                           textAlign: TextAlign.center,
@@ -319,6 +319,7 @@ class _AdminAssignedTicketsScreenState
                       },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accentOrange,
+                foregroundColor: Colors.white,
                 ),
                 child: const Text('REASSIGN'),
               ),
@@ -346,7 +347,7 @@ class _AdminAssignedTicketsScreenState
           targetUserId: newDriverUserId,
           title: 'Trip Reassigned',
           message:
-              'Trip ${ticket.ticketId} has been reassigned to you. Stage: ${_getStageLabel(ticket.currentStage)}. Please check your assigned tickets.',
+              'Trip ${ticket.ticketId} has been reassigned to you. Stage: ${_getStageLabel(ticket.currentStage)}. Please check your assigned trips.',
           ticketId: ticket.ticketId,
         );
       } catch (_) {

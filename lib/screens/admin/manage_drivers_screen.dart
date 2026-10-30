@@ -673,6 +673,7 @@ class _AddDriverSheetState extends ConsumerState<AddDriverSheet> {
         companyCode: admin.companyCode,
         role: 'driver',
         companyShortName: company['short_name'] as String,
+        fullName: _nameController.text.trim(),
       );
 
       final seqRes = await Supabase.instance.client

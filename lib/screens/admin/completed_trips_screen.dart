@@ -14,6 +14,7 @@ import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
 import 'package:sanjay_roadlines_fleet/core/widgets/reassignment_history.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/detention.dart';
 import 'package:sanjay_roadlines_fleet/providers/driver_names_provider.dart';
+import 'package:sanjay_roadlines_fleet/repositories/report_repository.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class CompletedTripsScreen extends ConsumerStatefulWidget {
@@ -400,7 +401,8 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
                       icon: const Icon(Icons.download),
                       label: const Text('EXPORT REPORT'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryDark,
+                        backgroundColor: AppColors.brandYellow,
+                foregroundColor: AppColors.onBrandYellow,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                     ),
@@ -491,6 +493,8 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
         loading: loading,
         unloading: unloading,
         companyName: await currentBusinessName(ref),
+        unloadedBy: driverNameOf(ref, ticket.driverUserId),
+        driverChanges: await ReportRepository().driverChangeLines(ticket.ticketId),
       );
 
       await Printing.layoutPdf(

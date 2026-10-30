@@ -63,7 +63,8 @@ class TicketRepository {
         .from(SupabaseConstants.tableTickets)
         .select(_cols)
         .eq('company_code', companyCode)
-        .eq('status', 'in_transit')
+        // A vehicle is on the road from the moment a trip is assigned
+        .inFilter('status', ['assigned', 'in_transit'])
         .order('assigned_at', ascending: false);
     return (response as List)
         .map((j) => TicketModel.fromJson(j as Map<String, dynamic>))

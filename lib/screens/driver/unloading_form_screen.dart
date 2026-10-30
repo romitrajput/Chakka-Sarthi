@@ -14,6 +14,9 @@ import 'package:sanjay_roadlines_fleet/core/utils/local_notification_service.dar
 import 'package:sanjay_roadlines_fleet/repositories/notification_repository.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
+import 'package:sanjay_roadlines_fleet/repositories/report_repository.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 import 'package:image_picker/image_picker.dart';
 
 class UnloadingFormScreen extends ConsumerStatefulWidget {
@@ -263,6 +266,8 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
           loading: loading,
           unloading: unloadingStatus,
           companyName: await currentBusinessName(ref),
+          unloadedBy: user.fullName,
+          driverChanges: await ReportRepository().driverChangeLines(widget.ticketId),
         );
       } catch (_) {
         pdfBytes = Uint8List(0);
@@ -274,6 +279,14 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
         pdfBytes: pdfBytes,
         companyCode: user.companyCode,
       );
+
+      // Record who did the unloading (matters when a trip was re-assigned mid-way)
+      try {
+        await Supabase.instance.client
+            .from(SupabaseConstants.tableUnloadingStatus)
+            .update({'unloaded_by': user.fullName})
+            .eq('ticket_id', widget.ticketId);
+      } catch (_) {}
 
       // Pop-up: Unloading Completed
       LocalNotificationService.notifyUnloadingCompleted(user.fullName, widget.ticketId);
@@ -293,7 +306,7 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
           targetUserId: adminId,
           title: 'Trip Completed',
           message:
-              'Ticket ${widget.ticketId} completed by ${user.fullName}. Shortage: ${_shortage.toStringAsFixed(2)} Kgs',
+              'Trip ${widget.ticketId} completed by ${user.fullName}. Shortage: ${_shortage.toStringAsFixed(2)} Kgs',
           ticketId: widget.ticketId,
         );
       }
@@ -688,6 +701,7 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
                         onPressed: _isSubmitting ? null : _submit,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.errorRed,
+                foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),

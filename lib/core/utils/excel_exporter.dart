@@ -44,7 +44,7 @@ class ExcelExporter {
     sheet.cell(CellIndex.indexByString('A1')).cellStyle = bold;
 
     const headers = [
-      'Trip ID', 'Driver', 'Assigned', 'Completed', 'LR Number', 'From', 'To', 'Consignee', 'Product',
+      'Trip ID', 'Vehicle', 'Loaded by', 'Unloaded by', 'Driver changes', 'Assigned', 'Completed', 'LR Number', 'From', 'To', 'Consignee', 'Product',
       'Loading (kg)', 'Unloading (kg)', 'Shortage (kg)', 'Reporting Date', 'Unloading Date', 'Detention (days)',
     ];
     sheet.appendRow(headers.map((h) => TextCellValue(h)).toList());
@@ -68,7 +68,10 @@ class ExcelExporter {
       totalDetention += detention;
       sheet.appendRow([
         TextCellValue((t['ticketId'] ?? '').toString()),
-        TextCellValue((t['driverName'] ?? t['driverUserId'] ?? '').toString()),
+        TextCellValue((t['vehicleNumber'] ?? vehicleNumber).toString()),
+        TextCellValue((t['loadedBy'] ?? t['driverName'] ?? '').toString()),
+        TextCellValue((t['unloadedBy'] ?? t['driverName'] ?? '').toString()),
+        TextCellValue(((t['driverChanges'] as List?) ?? const []).join('; ')),
         TextCellValue(_dateTime(t['assignedAt'])),
         TextCellValue(_dateTime(t['completedAt'])),
         TextCellValue((t['lrNumber'] ?? '').toString()),
@@ -87,7 +90,7 @@ class ExcelExporter {
 
     sheet.appendRow([
       TextCellValue('TOTAL (${trips.length} trips)'),
-      null, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, null, null, null, null, null,
       DoubleCellValue(totalLoad),
       DoubleCellValue(totalUnload),
       DoubleCellValue(totalShort),
@@ -99,7 +102,7 @@ class ExcelExporter {
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: totalRow)).cellStyle = bold;
     }
     for (var c = 0; c < headers.length; c++) {
-      sheet.setColumnWidth(c, c == 0 ? 20 : (c == 1 || c == 7 ? 22 : 16));
+      sheet.setColumnWidth(c, c == 4 ? 40 : (c == 0 || c == 2 || c == 3 || c == 10 ? 22 : 16));
     }
 
     final bytes = excel.save();

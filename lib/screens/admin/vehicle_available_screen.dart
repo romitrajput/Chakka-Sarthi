@@ -383,7 +383,8 @@ class _VehicleAvailableScreenState extends ConsumerState<VehicleAvailableScreen>
                 Navigator.pop(context);
                 await _sendToMaintenance(vehicle, reasonController.text, fromDate!, expectedReturn);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentOrange),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentOrange,
+                foregroundColor: Colors.white,),
               child: const Text('Confirm'),
             ),
           ],
@@ -442,7 +443,8 @@ class _VehicleAvailableScreenState extends ConsumerState<VehicleAvailableScreen>
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed,
+                foregroundColor: Colors.white,),
             child: const Text('Remove'),
           ),
         ],

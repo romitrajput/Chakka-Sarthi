@@ -84,6 +84,10 @@ class _CreateTicketScreenState extends ConsumerState<CreateTicketScreen> {
             driverUserId: _selectedDriver!.userId,
           );
 
+      // The vehicle is now on a trip: refresh vehicle lists and counts everywhere
+      ref.invalidate(vehicleStateProvider);
+      ref.invalidate(availableVehiclesProvider);
+
       // 3. Notify the driver (appears on the driver's phone, not this one)
       bool driverNotified = true;
       try {
@@ -107,7 +111,7 @@ class _CreateTicketScreenState extends ConsumerState<CreateTicketScreen> {
 
       if (mounted) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Ticket Assigned Successfully'), backgroundColor: AppColors.successGreen),
+          const SnackBar(content: Text('Trip Assigned Successfully'), backgroundColor: AppColors.successGreen),
         );
         router.pop();
       }

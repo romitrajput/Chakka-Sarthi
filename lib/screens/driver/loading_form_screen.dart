@@ -202,13 +202,14 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
                 child: ElevatedButton(
                   onPressed: _isSubmitting ? null : _submit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryDark,
+                    backgroundColor: AppColors.brandYellow,
+                foregroundColor: AppColors.onBrandYellow,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
                   ),
                   child: _isSubmitting
                       ? const SizedBox(width: 22, height: 22,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          child: CircularProgressIndicator(color: AppColors.onBrandYellow, strokeWidth: 2))
                       : Text(currentLocale.languageCode == 'hi' ? 'लोडिंग स्थिति सबमिट करें' : 'SUBMIT LOADING STATUS',
                           style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.5)),
                 ),

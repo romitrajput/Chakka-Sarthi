@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 
 class ReportRepository {
@@ -22,7 +23,7 @@ class ReportRepository {
       
       final List ticketsList = ticketsRes as List;
       final totalTrips = ticketsList.length;
-      final inTransit = ticketsList.where((t) => t['status'] == 'in_transit').length;
+      final inTransit = ticketsList.where((t) => t['status'] == 'in_transit' || t['status'] == 'assigned').length;
       final completed = ticketsList.where((t) => t['status'] == 'completed').length;
 
       final List<String> ticketIds = ticketsList.map((t) => t['ticket_id'] as String).toList();
@@ -127,6 +128,69 @@ class ReportRepository {
     }
   }
 
+  /// Driver changes on a trip, oldest first, e.g.
+  /// "Sreeraj Balu → Bhavesh Ola (in transit, 30 Oct 2026, 07:40 PM)".
+  Future<List<String>> driverChangeLines(String ticketId) async {
+    try {
+      final logs = await _client
+          .from(SupabaseConstants.tableTripReassignments)
+          .select('old_driver_user_id, new_driver_user_id, reassigned_at, reassigned_at_stage')
+          .eq('ticket_id', ticketId)
+          .order('reassigned_at', ascending: true);
+      final rows = (logs as List).cast<Map<String, dynamic>>();
+      if (rows.isEmpty) return [];
+      final ids = <String>{
+        for (final r in rows) ...[r['old_driver_user_id'] as String, r['new_driver_user_id'] as String],
+      };
+      final names = await _namesFor(ids);
+      String stage(String? s) => switch (s) {
+            'assigned' => 'before loading',
+            'loading' => 'in transit',
+            'unloading' => 'at unloading',
+            _ => s ?? '',
+          };
+      return rows.map((r) {
+        final at = DateTime.tryParse(r['reassigned_at'] as String? ?? '');
+        final when = at == null
+            ? ''
+            : DateFormat('dd MMM yyyy, hh:mm a').format(at.toUtc().add(const Duration(hours: 5, minutes: 30)));
+        return '${names[r['old_driver_user_id']] ?? r['old_driver_user_id']} → '
+            '${names[r['new_driver_user_id']] ?? r['new_driver_user_id']} (${stage(r['reassigned_at_stage'] as String?)}${when.isEmpty ? '' : ', $when'})';
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<Map<String, String>> _namesFor(Set<String> userIds) async {
+    if (userIds.isEmpty) return {};
+    final users = await _client
+        .from(SupabaseConstants.tableUsers)
+        .select('user_id, full_name')
+        .inFilter('user_id', userIds.toList());
+    return {
+      for (final u in (users as List).cast<Map<String, dynamic>>()) u['user_id'] as String: u['full_name'] as String,
+    };
+  }
+
+  /// Every vehicle's report for the period, merged into one list (newest trips first).
+  Future<List<Map<String, dynamic>>> getAllVehiclesTrips({
+    required List<String> vehicleNumbers,
+    required String companyCode,
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) async {
+    final all = <Map<String, dynamic>>[];
+    for (final v in vehicleNumbers) {
+      final r = await getVehicleMonthlyReport(
+        vehicleNumber: v, companyCode: companyCode, fromDate: fromDate, toDate: toDate);
+      final trips = r['tripDetails'];
+      if (trips is List) all.addAll(trips.cast<Map<String, dynamic>>());
+    }
+    all.sort((a, b) => (b['completedAt'] ?? '').toString().compareTo((a['completedAt'] ?? '').toString()));
+    return all;
+  }
+
   // GET VEHICLE MONTHLY REPORT
   Future<Map<String, dynamic>> getVehicleMonthlyReport({
     required String vehicleNumber,
@@ -195,12 +259,19 @@ class ReportRepository {
             .eq('ticket_id', ticketId)
             .maybeSingle();
 
-        // Get full unloading details
+        // Get full unloading details ('*' so it also works before the unloaded_by column exists)
         final fullUnloadingRes = await _client
             .from(SupabaseConstants.tableUnloadingStatus)
-            .select('unloading_date')
+            .select('*')
             .eq('ticket_id', ticketId)
             .maybeSingle();
+
+        // Who loaded, who unloaded, and any driver changes in between
+        final finalDriverId = t['driver_user_id'] as String?;
+        final finalDriverName = finalDriverId == null ? null : (await _namesFor({finalDriverId}))[finalDriverId];
+        final loadedBy = fullLoadingRes?['driver_name'] as String?;
+        final unloadedBy = (fullUnloadingRes?['unloaded_by'] as String?) ?? finalDriverName;
+        final driverChanges = await driverChangeLines(ticketId);
 
         tripDetails.add({
           'ticketId': ticketId,
@@ -220,7 +291,13 @@ class ReportRepository {
           'journeyTo': fullLoadingRes?['journey_to'],
           'consigneeName': fullLoadingRes?['consignee_name'],
           'product': fullLoadingRes?['product'],
-          'driverName': fullLoadingRes?['driver_name'],
+          'driverName': (loadedBy != null && unloadedBy != null && loadedBy != unloadedBy)
+              ? '$loadedBy → $unloadedBy'
+              : (unloadedBy ?? loadedBy),
+          'loadedBy': loadedBy,
+          'unloadedBy': unloadedBy,
+          'driverChanges': driverChanges,
+          'vehicleNumber': vehicleNumber,
           'loadingDate': fullLoadingRes?['creation_date'],
           // Full unloading details
           'unloadingDate': fullUnloadingRes?['unloading_date'],

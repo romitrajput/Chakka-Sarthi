@@ -23,7 +23,7 @@ class AssignedTicketScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(currentLocale.languageCode == 'hi' ? 'सौंपे गए टिकट' : 'Assigned Tickets')),
+      appBar: AppBar(title: Text(currentLocale.languageCode == 'hi' ? 'सौंपी गई यात्राएं' : 'Assigned Trips')),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(ticketStateProvider),
         child: ticketState.when(

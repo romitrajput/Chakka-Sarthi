@@ -33,6 +33,7 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
     // Fetch the latest business name (the admin may have changed it)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) ref.invalidate(businessNameProvider);
+      _applyMyLanguage();
     });
     _pulseController = AnimationController(
       vsync: this,
@@ -43,6 +44,17 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     _loadNotificationSettings();
+  }
+
+  /// Use this driver's own language choice (English if none).
+  Future<void> _applyMyLanguage() async {
+    final userId = ref.read(authStateProvider).value?.userId;
+    final code = await AppTranslations.loadLanguage(userId: userId);
+    if (!mounted) return;
+    ref.read(languageProvider.notifier).state = Locale(code);
+    try {
+      await LocalNotificationService.initializeTranslation(targetLanguageCode: code);
+    } catch (_) {}
   }
 
   Future<void> _loadNotificationSettings() async {
@@ -92,6 +104,10 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authStateProvider).value;
+    // A new notification (e.g. trip assigned or re-assigned): refresh my trips
+    ref.listen(notificationStreamProvider, (previous, next) {
+      if (previous?.value?.length != next.value?.length) ref.invalidate(ticketStateProvider);
+    });
     final ticketState = ref.watch(ticketStateProvider);
     final currentLocale = ref.watch(languageProvider);
     final screenW = MediaQuery.of(context).size.width;
@@ -125,8 +141,9 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
             },
           ),
           IconButton(
-            icon: const Icon(Icons.logout_outlined, size: 22),
-            onPressed: () => _confirmLogout(context, ref),
+            icon: const Icon(Icons.settings_outlined, size: 24),
+            tooltip: 'Settings',
+            onPressed: () => _showDriverSettings(context, ref),
           ),
         ],
       ),
@@ -296,88 +313,67 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
 
             const SizedBox(height: 24),
 
-            // Account Settings
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: _cardDecoration(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.person_outline, size: 20, color: AppColors.primaryDark),
-                        const SizedBox(width: 8),
-                        Text(
-                          _tr('accountSettings'),
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.lock_reset, color: AppColors.errorRed, size: 22),
-                      title: Text(
-                        _tr('resetMpin'),
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      subtitle: Text(
-                        _tr('resetMpinDesc'),
-                        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                      ),
-                      trailing: const Icon(Icons.chevron_right, size: 20),
-                      onTap: () => _showResetMpinDialog(context, ref),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Notification Settings
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: _cardDecoration(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.notifications_active_outlined, size: 20, color: AppColors.primaryDark),
-                        const SizedBox(width: 8),
-                        Text(
-                          _tr('notifications'),
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        _tr('popUpNotifications'),
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                      subtitle: Text(
-                        _tr('popUpNotificationsDesc'),
-                        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                      ),
-                      value: _notificationsEnabled,
-                      activeThumbColor: AppColors.primaryDark,
-                      onChanged: _toggleNotifications,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
             const SizedBox(height: 24),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Settings: reset MPIN, pop-up notifications on/off, log out.
+  void _showDriverSettings(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Text(_tr('accountSettings'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.lock_reset, color: AppColors.primaryDark),
+                  title: Text(_tr('resetMpin')),
+                  subtitle: Text(_tr('resetMpinDesc'), style: const TextStyle(fontSize: 12)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _showResetMpinDialog(context, ref);
+                  },
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.notifications_active_outlined, color: AppColors.primaryDark),
+                  title: Text(_tr('popUpNotifications')),
+                  subtitle: Text(_tr('popUpNotificationsDesc'), style: const TextStyle(fontSize: 12)),
+                  value: _notificationsEnabled,
+                  activeThumbColor: AppColors.ink,
+                  onChanged: (v) async {
+                    await _toggleNotifications(v);
+                    setSheetState(() {});
+                  },
+                ),
+                const Divider(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.logout, color: AppColors.errorRed),
+                  title: Text(_tr('logout'), style: const TextStyle(color: AppColors.errorRed, fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _confirmLogout(context, ref);
+                  },
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -398,7 +394,8 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
               ref.read(authStateProvider.notifier).logout();
               context.go('/login');
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed,
+                foregroundColor: Colors.white,),
             child: Text(_tr('logout')),
           ),
         ],
@@ -488,7 +485,8 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
                 }
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed,
+                foregroundColor: Colors.white,),
             child: Text(_tr('resetMpin')),
           ),
         ],
@@ -603,7 +601,8 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
                           }
 
                           // Save language preference
-                          await AppTranslations.saveLanguage(lang.code);
+                          await AppTranslations.saveLanguage(lang.code,
+                              userId: ref.read(authStateProvider).value?.userId);
 
                           // Initialize translation service
                           await translationService.setTargetLanguage(lang.mlKitLanguage);
