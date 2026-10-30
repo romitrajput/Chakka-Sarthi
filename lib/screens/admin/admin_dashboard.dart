@@ -8,6 +8,8 @@ import 'package:sanjay_roadlines_fleet/providers/auth_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/ticket_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/vehicle_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
+import 'package:sanjay_roadlines_fleet/providers/licence_alerts_provider.dart';
+import 'package:sanjay_roadlines_fleet/models/user_model.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class AdminDashboard extends ConsumerStatefulWidget {
@@ -39,6 +41,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     _checkedBusinessName = true;
     try {
       ref.invalidate(businessNameProvider); // always show the latest saved name
+      ref.invalidate(expiringLicencesProvider); // fresh licence alerts
       final name = await ref.read(businessNameProvider.future);
       if (name == null && mounted) {
         await showBusinessNameDialog(context, ref, required: true);
@@ -126,6 +129,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     int availableCount,
     int assignedCount,
   ) {
+    final expiring = ref.watch(expiringLicencesProvider).value ?? const <UserModel>[];
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Column(
@@ -244,7 +248,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Fleet Overview', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      const Text('Fleet Overview', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
@@ -279,7 +283,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                                   '$totalVehicles',
                                   style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                                 ),
-                                const Text('Total\nVehicles', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                                const Text('vehicles', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                               ],
                             ),
                           ),
@@ -306,157 +310,143 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
 
           const SizedBox(height: 16),
 
-          // ===== Stats Row =====
+          // ===== Status row: four equal tiles =====
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _buildStatItem('Total Vehicles', '$totalVehicles', Icons.directions_car_filled, AppColors.primaryDark),
-                const SizedBox(width: 8),
-                _buildStatItem('In Transit', '$inTransitCount', Icons.local_shipping_outlined, AppColors.accentOrange),
-                const SizedBox(width: 8),
-                _buildStatItem('Completed', '$completedTodayCount', Icons.check_circle_outline, AppColors.successGreen),
-                const SizedBox(width: 8),
-                _buildStatItem('Maintenance', '$maintenanceCount', Icons.build_circle_outlined, AppColors.errorRed),
-              ],
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildStatItem('Vehicles', '$totalVehicles', Icons.directions_car_filled_outlined, AppColors.ink, AppColors.mist),
+                  const SizedBox(width: 8),
+                  _buildStatItem('In Transit', '$inTransitCount', Icons.local_shipping_outlined, AppColors.warningYellow, AppColors.inTransitBg),
+                  const SizedBox(width: 8),
+                  _buildStatItem('Completed', '$completedTodayCount', Icons.check_circle_outline, AppColors.successGreen, AppColors.availableBg),
+                  const SizedBox(width: 8),
+                  _buildStatItem('Maintenance', '$maintenanceCount', Icons.build_outlined, const Color(0xFFA33A00), AppColors.maintenanceBg),
+                ],
+              ),
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
 
-          // ===== Cards Grid — Wrap layout so cards grow with content =====
+          // ===== Main action: Create New Trip =====
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final spacing = 10.0;
-                final itemWidth = (constraints.maxWidth - spacing) / 2;
-                final cards = <Widget>[
-                  _buildMenuCard(
-                    context,
-                    'Create New Trip',
-                    'Plan & create a new trip',
-                    Icons.add_road,
-                    AppColors.primaryDark,
-                    () => context.push('/admin/create-ticket'),
-                    highlight: true,
+            child: Material(
+              color: AppColors.brandYellow,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => context.push('/admin/create-ticket'),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(color: AppColors.ink, borderRadius: BorderRadius.circular(12)),
+                        child: const Icon(Icons.add, color: AppColors.brandYellow, size: 26),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Create New Trip', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                            SizedBox(height: 2),
+                            Text('Assign a vehicle and driver', style: TextStyle(fontSize: 13, color: AppColors.ink)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right, color: AppColors.ink),
+                    ],
                   ),
-                  _buildMenuCard(
-                    context,
-                    'Re-assign Driver',
-                    'Reassign active trips',
-                    Icons.swap_horiz,
-                    AppColors.primaryDark,
-                    () => context.push('/admin/assigned-tickets'),
-                    badge: assignedCount,
-                  ),
-                  _buildMenuCard(
-                    context,
-                    'In Transit',
-                    'View ongoing trips',
-                    Icons.local_shipping_outlined,
-                    AppColors.primaryDark,
-                    () => context.push('/admin/in-transit'),
-                    badge: inTransitCount,
-                  ),
-                  _buildMenuCard(
-                    context,
-                    'Completed Trips',
-                    'View trip history',
-                    Icons.task_alt,
-                    AppColors.primaryDark,
-                    () => context.push('/admin/completed-trips'),
-                    badge: completedTodayCount,
-                  ),
-                  _buildMenuCard(
-                    context,
-                    'Vehicles',
-                    'Available & maintenance',
-                    Icons.directions_car_filled,
-                    AppColors.primaryDark,
-                    () => context.push('/admin/vehicles-available'),
-                    badge: availableCount,
-                  ),
-                  _buildMenuCard(
-                    context,
-                    'Maintenance',
-                    'Manage vehicle maintenance',
-                    Icons.build_circle_outlined,
-                    AppColors.primaryDark,
-                    () => context.push('/admin/maintenance'),
-                    badge: maintenanceCount,
-                  ),
-                  _buildMenuCard(
-                    context,
-                    'Dashboard',
-                    'Analytics & fleet overview',
-                    Icons.analytics_outlined,
-                    AppColors.primaryDark,
-                    () => context.push('/admin/reports'),
-                  ),
-                ];
-                return Wrap(
-                  spacing: spacing,
-                  runSpacing: spacing,
-                  children: cards.map((c) => SizedBox(width: itemWidth, child: c)).toList(),
-                );
-              },
+                ),
+              ),
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
 
-          // ===== Recent Alerts =====
+          // ===== Licence expiry alert (only when something needs attention) =====
+          Builder(builder: (context) {
+            if (expiring.isEmpty) return const SizedBox.shrink();
+            final expired = expiring.where((d) => (d.licenseDaysLeft ?? 1) < 0).length;
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Material(
+                color: AppColors.cancelledBg,
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => context.push('/admin/manage-drivers'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.badge_outlined, color: AppColors.errorRed),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                expired > 0
+                                    ? '$expired driving licence${expired == 1 ? '' : 's'} expired'
+                                    : '${expiring.length} driving licence${expiring.length == 1 ? '' : 's'} expiring soon',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.errorRed),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                expiring.take(3).map((d) => d.fullName).join(', ') + (expiring.length > 3 ? '…' : ''),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right, color: AppColors.errorRed),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+
+          // ===== Tiles: two equal columns =====
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
-                // Recent Alerts
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: _cardDecoration(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Recent Alerts', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 10),
-                      if (maintenanceCount > 0)
-                        _buildAlertItem(
-                          Icons.build_circle_outlined,
-                          'Maintenance due',
-                          '$maintenanceCount vehicle(s)',
-                          AppColors.errorRed,
-                        ),
-                      if (assignedCount > 0)
-                        _buildAlertItem(
-                          Icons.assignment_outlined,
-                          'Pending trips',
-                          '$assignedCount trip(s) assigned',
-                          AppColors.accentOrange,
-                        ),
-                      if (inTransitCount > 0)
-                        _buildAlertItem(
-                          Icons.local_shipping_outlined,
-                          'In transit',
-                          '$inTransitCount trip(s) active',
-                          AppColors.primaryDark,
-                        ),
-                      if (maintenanceCount == 0 && assignedCount == 0 && inTransitCount == 0)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 16),
-                          child: Center(
-                            child: Column(
-                              children: [
-                                Icon(Icons.check_circle_outline, size: 36, color: AppColors.successGreen.withValues(alpha: 0.5)),
-                                const SizedBox(height: 8),
-                                const Text('All clear!', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                _tileRow(
+                  _buildMenuCard(Icons.local_shipping_outlined, 'In Transit', 'Ongoing trips',
+                      () => context.push('/admin/in-transit'),
+                      badge: inTransitCount, badgeBg: AppColors.inTransitBg, badgeFg: AppColors.warningYellow),
+                  _buildMenuCard(Icons.swap_horiz, 'Re-assign Driver', 'Active trips',
+                      () => context.push('/admin/assigned-tickets'),
+                      badge: assignedCount, badgeBg: Colors.white, badgeFg: AppColors.ink, badgeOutlined: true),
+                ),
+                const SizedBox(height: 10),
+                _tileRow(
+                  _buildMenuCard(Icons.check_circle_outline, 'Completed Trips', 'Trip history',
+                      () => context.push('/admin/completed-trips'),
+                      badge: completedTodayCount, badgeBg: AppColors.completedBg, badgeFg: AppColors.roadGrey),
+                  _buildMenuCard(Icons.build_outlined, 'Maintenance', 'Vehicles in the workshop',
+                      () => context.push('/admin/maintenance'),
+                      badge: maintenanceCount, badgeBg: AppColors.maintenanceBg, badgeFg: const Color(0xFFA33A00)),
+                ),
+                const SizedBox(height: 10),
+                _tileRow(
+                  _buildMenuCard(Icons.directions_car_filled_outlined, 'Vehicles', 'Available & maintenance',
+                      () => context.push('/admin/vehicles-available'),
+                      badge: availableCount, badgeBg: AppColors.availableBg, badgeFg: AppColors.successGreen),
+                  _buildMenuCard(Icons.bar_chart_rounded, 'Reports', 'Summary & PDF export',
+                      () => context.push('/admin/reports')),
                 ),
               ],
             ),
@@ -468,44 +458,40 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
+  /// Two tiles side by side, always the same height.
+  Widget _tileRow(Widget left, Widget right) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [Expanded(child: left), const SizedBox(width: 10), Expanded(child: right)],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, IconData icon, Color color, Color tint) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              color.withValues(alpha: 0.08),
-              Colors.white,
-            ],
-          ),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.15)),
-          boxShadow: [
-            BoxShadow(color: color.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2)),
-          ],
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.divider),
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               width: 32,
               height: 32,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
+              decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(10)),
               child: Icon(icon, size: 18, color: color),
             ),
             const SizedBox(height: 6),
-            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: color)),
             const SizedBox(height: 2),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 9, color: AppColors.textSecondary, height: 1.2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(label, maxLines: 1, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             ),
           ],
         ),
@@ -513,56 +499,65 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     );
   }
 
-  Widget _buildMenuCard(BuildContext context, String title, String subtitle, IconData icon, Color color, VoidCallback onTap, {int? badge, bool highlight = false}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          // The main action (Create New Trip) is brand yellow; the rest are white
-          color: highlight ? AppColors.brandYellow : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.12)),
-          boxShadow: [
-            BoxShadow(color: color.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 3)),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: highlight ? AppColors.ink : color.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: highlight ? AppColors.brandYellow : color, size: 20),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+  Widget _buildMenuCard(
+    IconData icon,
+    String title,
+    String subtitle,
+    VoidCallback onTap, {
+    int? badge,
+    Color badgeBg = AppColors.mist,
+    Color badgeFg = AppColors.ink,
+    bool badgeOutlined = false,
+  }) {
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.divider),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: TextStyle(fontSize: 10, color: highlight ? AppColors.ink : AppColors.textSecondary, height: 1.3)),
+                  Icon(icon, size: 24, color: AppColors.ink),
+                  const Spacer(),
+                  if (badge != null && badge > 0)
+                    Container(
+                      constraints: const BoxConstraints(minWidth: 26),
+                      height: 26,
+                      padding: const EdgeInsets.symmetric(horizontal: 7),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: badgeBg,
+                        borderRadius: BorderRadius.circular(13),
+                        border: badgeOutlined ? Border.all(color: AppColors.ink, width: 1.5) : null,
+                      ),
+                      child: Text('$badge', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: badgeFg)),
+                    ),
                 ],
               ),
-            ),
-            if (badge != null && badge > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text('$badge', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ink),
               ),
-            if (badge == null || badge == 0)
-              Icon(Icons.arrow_forward_ios, size: 10, color: color.withValues(alpha: 0.4)),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.3),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -570,44 +565,13 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
 
   Widget _buildLegendItem(String label, String count, Color color) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
           Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
           const SizedBox(width: 8),
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary))),
-          Text(count, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAlertItem(IconData icon, String title, String subtitle, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 15, color: color),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 1),
-                Text(subtitle, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.ink))),
+          Text(count, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         ],
       ),
     );
@@ -633,7 +597,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                 ),
               ),
               ListTile(
-                leading: const Icon(Icons.storefront_outlined, color: AppColors.primaryDark),
+                leading: const Icon(Icons.local_shipping_outlined, color: AppColors.primaryDark),
                 title: const Text('Business name'),
                 subtitle: Text(
                   ref.read(businessNameProvider).value ?? 'Not set yet',

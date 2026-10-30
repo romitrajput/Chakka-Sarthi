@@ -10,6 +10,7 @@ import 'package:sanjay_roadlines_fleet/repositories/ticket_repository.dart';
 import 'package:sanjay_roadlines_fleet/repositories/notification_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sanjay_roadlines_fleet/core/widgets/reassignment_history.dart';
+import 'package:sanjay_roadlines_fleet/providers/driver_names_provider.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 
 final reassignDriversProvider = FutureProvider<List<UserModel>>((ref) async {
@@ -18,7 +19,7 @@ final reassignDriversProvider = FutureProvider<List<UserModel>>((ref) async {
 
   final response = await Supabase.instance.client
       .from(SupabaseConstants.tableUsers)
-      .select('id, user_id, full_name, mobile, role, company_code, mpin_hash, is_first_login, is_active, sequential_num, created_at')
+      .select('id, user_id, full_name, mobile, role, company_code, is_first_login, is_active, sequential_num, created_at')
       .eq('company_code', user.companyCode)
       .eq('role', 'driver')
       .eq('is_active', true)
@@ -66,6 +67,7 @@ class _AdminAssignedTicketsScreenState
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(driverNamesProvider); // redraw when driver names load
     final activeTicketsAsync = ref.watch(allActiveTicketsProvider);
 
     return Scaffold(
@@ -226,7 +228,7 @@ class _AdminAssignedTicketsScreenState
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                'Driver: ${ticket.driverUserId}',
+                                'Driver: ${driverNameOf(ref, ticket.driverUserId)}',
                                 style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                               ),
                             ),
@@ -351,6 +353,18 @@ class _AdminAssignedTicketsScreenState
         // Background notification - don't block UI
       }
 
+      // Tell the previous driver the trip is no longer theirs
+      if (ticket.driverUserId != newDriverUserId) {
+        try {
+          await NotificationRepository().sendNotification(
+            targetUserId: ticket.driverUserId,
+            title: 'Trip Re-assigned',
+            message: 'Trip ${ticket.ticketId} has been re-assigned to another driver. You no longer need to complete it.',
+            ticketId: ticket.ticketId,
+          );
+        } catch (_) {}
+      }
+
       // Refresh tickets
       ref.invalidate(allActiveTicketsProvider);
       ref.invalidate(assignedTicketsProvider);
@@ -463,8 +477,9 @@ class _ReassignTicketCard extends StatelessWidget {
                     size: 18, color: AppColors.textSecondary),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(
-                    'Driver: ${ticket.driverUserId}',
+                  child: DriverName(
+                    ticket.driverUserId,
+                    prefix: 'Driver: ',
                     style: const TextStyle(
                         fontSize: 12, color: AppColors.textSecondary),
                   ),

@@ -10,9 +10,8 @@ import 'package:sanjay_roadlines_fleet/models/vehicle_model.dart';
 import 'package:sanjay_roadlines_fleet/providers/auth_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/vehicle_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/ticket_provider.dart';
-import 'package:sanjay_roadlines_fleet/providers/notification_provider.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/ticket_id_generator.dart';
-import 'package:sanjay_roadlines_fleet/core/utils/local_notification_service.dart';
+import 'package:sanjay_roadlines_fleet/repositories/notification_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 
@@ -22,7 +21,7 @@ final driversProvider = FutureProvider.autoDispose<List<UserModel>>((ref) async 
   
   final response = await Supabase.instance.client
       .from(SupabaseConstants.tableUsers)
-      .select('id, user_id, full_name, mobile, role, company_code, mpin_hash, is_first_login, is_active, sequential_num, created_at')
+      .select('id, user_id, full_name, mobile, role, company_code, is_first_login, is_active, sequential_num, created_at')
       .eq('company_code', user.companyCode)
       .eq('role', 'driver')
       .eq('is_active', true)
@@ -85,19 +84,26 @@ class _CreateTicketScreenState extends ConsumerState<CreateTicketScreen> {
             driverUserId: _selectedDriver!.userId,
           );
 
-      // 3. Notify Driver
-      await ref.read(notificationControllerProvider.notifier).send(
-            targetUserId: _selectedDriver!.userId,
-            title: 'New Trip Assigned',
-            message: 'Trip $ticketId assigned. Vehicle: ${_selectedVehicle!.vehicleNumber}',
-            ticketId: ticketId,
-          );
-
-      // 4. Local push notification to driver
-      LocalNotificationService.showNotification(
-        title: '🚛 New Trip Assigned',
-        body: 'Trip $ticketId assigned. Vehicle: ${_selectedVehicle!.vehicleNumber}',
-      );
+      // 3. Notify the driver (appears on the driver's phone, not this one)
+      bool driverNotified = true;
+      try {
+        await NotificationRepository().sendNotification(
+          targetUserId: _selectedDriver!.userId,
+          title: '🚛 New Trip Assigned',
+          message: 'Trip $ticketId has been assigned to you. Vehicle: ${_selectedVehicle!.vehicleNumber}',
+          ticketId: ticketId,
+        );
+      } catch (_) {
+        driverNotified = false;
+      }
+      if (!driverNotified && mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Trip created, but ${_selectedDriver!.fullName} could not be notified. Please inform them.'),
+            backgroundColor: AppColors.accentOrange,
+          ),
+        );
+      }
 
       if (mounted) {
         messenger.showSnackBar(

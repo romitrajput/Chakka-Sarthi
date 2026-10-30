@@ -8,6 +8,7 @@ import 'package:sanjay_roadlines_fleet/providers/ticket_provider.dart';
 import 'package:sanjay_roadlines_fleet/repositories/loading_unloading_repository.dart';
 import 'package:sanjay_roadlines_fleet/repositories/ticket_repository.dart';
 import 'package:intl/intl.dart';
+import 'package:sanjay_roadlines_fleet/providers/driver_names_provider.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class InTransitScreen extends ConsumerStatefulWidget {
@@ -38,6 +39,7 @@ class _InTransitScreenState extends ConsumerState<InTransitScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(driverNamesProvider); // redraw when driver names load
     final ticketsAsync = ref.watch(ticketStateProvider);
     final currentLocale = ref.watch(languageProvider);
 
@@ -190,7 +192,7 @@ class _InTransitScreenState extends ConsumerState<InTransitScreen> {
                 },
               ),
               const SizedBox(height: 8),
-              _buildInfoRow(Icons.person, 'Driver', ticket.driverUserId),
+              _buildInfoRow(Icons.person, 'Driver', driverNameOf(ref, ticket.driverUserId)),
               const SizedBox(height: 8),
               _buildInfoRow(Icons.event, 'Assigned', ticket.formattedAssignedAt),
               // Show reassignment info

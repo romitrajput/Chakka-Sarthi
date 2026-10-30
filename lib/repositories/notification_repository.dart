@@ -11,17 +11,23 @@ class NotificationRepository {
     required String message,
     String? ticketId,
   }) async {
+    final row = await _client
+        .from(SupabaseConstants.tableNotifications)
+        .insert({
+          'target_user_id': targetUserId,
+          'title': title,
+          'message': message,
+          'ticket_id': ticketId,
+          'is_read': false,
+        })
+        .select('id')
+        .single();
+
+    // Also send it to the phone even if the app is closed (needs the send-push
+    // function in Supabase; if it isn't set up, the in-app notification still works)
     try {
-      await _client.from(SupabaseConstants.tableNotifications).insert({
-        'target_user_id': targetUserId,
-        'title': title,
-        'message': message,
-        'ticket_id': ticketId,
-        'is_read': false,
-      });
-    } catch (e) {
-      rethrow;
-    }
+      await _client.functions.invoke('send-push', body: {'id': row['id']});
+    } catch (_) {}
   }
 
   Stream<List<NotificationModel>> getNotificationsStream(String userId) {

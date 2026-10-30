@@ -23,7 +23,7 @@ class AppStrings {
   static const String completedTrips = 'Completed Trips';
   static const String vehicleAvailable = 'Vehicle Available';
   static const String maintenance = 'Maintenance';
-  static const String reports = 'Dashboard';
+  static const String reports = 'Reports';
   static const String assignedTickets = 'Assigned Tickets';
 
   // Forms

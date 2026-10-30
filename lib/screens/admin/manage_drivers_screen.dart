@@ -16,6 +16,9 @@ import 'package:sanjay_roadlines_fleet/core/utils/user_id_generator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sanjay_roadlines_fleet/screens/admin/create_ticket_screen.dart' show driversProvider;
 import 'package:sanjay_roadlines_fleet/screens/admin/assigned_tickets_screen.dart' show reassignDriversProvider;
+import 'package:sanjay_roadlines_fleet/providers/driver_names_provider.dart';
+import 'package:intl/intl.dart';
+import 'package:sanjay_roadlines_fleet/providers/licence_alerts_provider.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 
 final allDriversProvider = FutureProvider<List<UserModel>>((ref) async {
@@ -24,7 +27,7 @@ final allDriversProvider = FutureProvider<List<UserModel>>((ref) async {
   
   final response = await Supabase.instance.client
       .from(SupabaseConstants.tableUsers)
-      .select('id, user_id, full_name, mobile, role, company_code, mpin_hash, is_first_login, is_active, sequential_num, created_at, driving_license_url, aadhaar_card_url')
+      .select('id, user_id, full_name, mobile, role, company_code, is_first_login, is_active, sequential_num, created_at, driving_license_url, aadhaar_card_url, license_expiry')
       .eq('company_code', user.companyCode)
       .eq('role', 'driver')
       .order('full_name');
@@ -146,6 +149,14 @@ class _ManageDriversScreenState extends ConsumerState<ManageDriversScreen> {
                             _docStatus(driver.aadhaarCardUrl != null, 'Aadhaar uploaded', 'No Aadhaar'),
                           ],
                         ),
+                        if (driver.licenseNeedsAttention)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              licenceStatusText(driver),
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.errorRed),
+                            ),
+                          ),
                       ],
                     ),
                     trailing: Container(
@@ -321,6 +332,8 @@ class _ManageDriversScreenState extends ConsumerState<ManageDriversScreen> {
           .eq('role', 'driver');
 
       ref.invalidate(allDriversProvider);
+      ref.invalidate(driverNamesProvider);
+      ref.invalidate(expiringLicencesProvider);
       navigator.pop(); // dismiss loading
       _exitSelectMode();
       messenger.showSnackBar(
@@ -356,6 +369,21 @@ class _ManageDriversScreenState extends ConsumerState<ManageDriversScreen> {
                 Text(driver.fullName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Text(driver.userId, style: const TextStyle(color: AppColors.textSecondary)),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.event_outlined,
+                      color: driver.licenseNeedsAttention ? AppColors.errorRed : AppColors.primaryDark),
+                  title: const Text('Licence expiry'),
+                  subtitle: Text(
+                    licenceStatusText(driver),
+                    style: TextStyle(color: driver.licenseNeedsAttention ? AppColors.errorRed : AppColors.textSecondary),
+                  ),
+                  trailing: TextButton(
+                    onPressed: () => _pickLicenceExpiry(driver),
+                    child: Text(driver.licenseExpiry == null ? 'Set' : 'Change'),
+                  ),
+                ),
 
                 // Uploaded documents
                 if (driver.drivingLicenseUrl != null || driver.aadhaarCardUrl != null) ...[
@@ -407,6 +435,8 @@ class _ManageDriversScreenState extends ConsumerState<ManageDriversScreen> {
                         .eq('user_id', driver.userId);
                     // Refresh every driver list so the change shows everywhere at once
                     ref.invalidate(allDriversProvider);
+      ref.invalidate(driverNamesProvider);
+      ref.invalidate(expiringLicencesProvider);
                     ref.invalidate(driversProvider);
                     ref.invalidate(reassignDriversProvider);
                     if (mounted) navigator.pop();
@@ -418,6 +448,35 @@ class _ManageDriversScreenState extends ConsumerState<ManageDriversScreen> {
         );
       },
     );
+  }
+
+  Future<void> _pickLicenceExpiry(UserModel driver) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: driver.licenseExpiry ?? now.add(const Duration(days: 365)),
+      firstDate: DateTime(now.year - 5),
+      lastDate: DateTime(now.year + 25),
+      helpText: 'Driving licence expiry',
+    );
+    if (picked == null || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await Supabase.instance.client
+          .from(SupabaseConstants.tableUsers)
+          .update({'license_expiry': DateFormat('yyyy-MM-dd').format(picked)})
+          .eq('user_id', driver.userId);
+      ref.invalidate(allDriversProvider);
+      ref.invalidate(expiringLicencesProvider);
+      navigator.pop();
+      messenger.showSnackBar(SnackBar(
+        content: Text('Licence expiry saved for ${driver.fullName}'),
+        backgroundColor: AppColors.successGreen,
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Could not save: $e'), backgroundColor: AppColors.errorRed));
+    }
   }
 
   void _showAddDriverSheet() {
@@ -442,6 +501,7 @@ class _AddDriverSheetState extends ConsumerState<AddDriverSheet> {
   final _nameController = TextEditingController();
   final _mobileController = TextEditingController();
   bool _isLoading = false;
+  DateTime? _licenseExpiry;
   final ImagePicker _picker = ImagePicker();
   
   Uint8List? _licenseImage;
@@ -641,6 +701,7 @@ class _AddDriverSheetState extends ConsumerState<AddDriverSheet> {
         'is_first_login': false,
         'is_active': true,
         'sequential_num': nextSeq,
+        if (_licenseExpiry != null) 'license_expiry': DateFormat('yyyy-MM-dd').format(_licenseExpiry!),
       });
 
       // Upload documents
@@ -676,6 +737,8 @@ class _AddDriverSheetState extends ConsumerState<AddDriverSheet> {
 
       if (mounted) {
         ref.invalidate(allDriversProvider);
+      ref.invalidate(driverNamesProvider);
+      ref.invalidate(expiringLicencesProvider);
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -798,7 +861,29 @@ class _AddDriverSheetState extends ConsumerState<AddDriverSheet> {
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: _validateMobile,
               ),
-              
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final now = DateTime.now();
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _licenseExpiry ?? now.add(const Duration(days: 365)),
+                    firstDate: DateTime(now.year - 5),
+                    lastDate: DateTime(now.year + 25),
+                    helpText: 'Driving licence expiry',
+                  );
+                  if (picked != null) setState(() => _licenseExpiry = picked);
+                },
+                icon: const Icon(Icons.event_outlined),
+                label: Text(_licenseExpiry == null
+                    ? 'Licence expiry date (optional)'
+                    : 'Licence expires ${DateFormat('dd MMM yyyy').format(_licenseExpiry!)}'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                  alignment: Alignment.centerLeft,
+                ),
+              ),
+
               // Document uploads (Required)
               const SizedBox(height: 24),
               Row(

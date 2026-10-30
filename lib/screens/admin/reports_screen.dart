@@ -15,6 +15,8 @@ import 'package:sanjay_roadlines_fleet/repositories/ticket_repository.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
+import 'package:sanjay_roadlines_fleet/providers/driver_names_provider.dart';
+import 'package:sanjay_roadlines_fleet/core/utils/excel_exporter.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
@@ -44,14 +46,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(driverNamesProvider); // redraw when driver names load
     final currentLocale = ref.watch(languageProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(currentLocale.languageCode == 'hi' ? 'डैशबोर्ड' : AppStrings.reports),
+        title: Text(currentLocale.languageCode == 'hi' ? 'रिपोर्ट' : AppStrings.reports),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.white,
+          indicatorColor: AppColors.brandYellow,
+          indicatorWeight: 3,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           isScrollable: true,
@@ -138,40 +142,106 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
   Widget _buildOverallSummaryTab() {
     final summaryAsync = ref.watch(reportStateProvider);
     final user = ref.watch(authStateProvider).value;
+    final kg = NumberFormat('#,##0.00', 'en_IN');
 
     return summaryAsync.when(
       data: (summary) {
         if (summary.isEmpty) return const Center(child: Text('No data available'));
 
-        // Company info header
-        final companyInfo = _buildCompanyInfoHeader(user);
+        final totalTrips = summary['totalTrips']?.toString() ?? '0';
+        final inTransit = summary['inTransit']?.toString() ?? '0';
+        final completed = summary['completed']?.toString() ?? '0';
+        final loading = (summary['totalLoadingKgs'] as num?)?.toDouble() ?? 0;
+        final unloading = (summary['totalUnloadingKgs'] as num?)?.toDouble() ?? 0;
+        final shortage = (summary['totalShortageKgs'] as num?)?.toDouble() ?? 0;
+        final utilization = ((summary['utilization'] as num?)?.toDouble() ?? 0).clamp(0, 100).toDouble();
+        final shortagePct = loading > 0 ? shortage / loading * 100 : 0.0;
 
-        final items = [
-          _SummaryItem('Total Trips', summary['totalTrips']?.toString() ?? '0', Icons.assignment, 'totalTrips'),
-          _SummaryItem('In Transit', summary['inTransit']?.toString() ?? '0', Icons.local_shipping, 'inTransit'),
-          _SummaryItem('Completed', summary['completed']?.toString() ?? '0', Icons.task_alt, 'completed'),
-          _SummaryItem('Total Loading (Kgs)', (summary['totalLoadingKgs'] as double?)?.toStringAsFixed(2) ?? '0.00', Icons.add_circle_outline, 'loading'),
-          _SummaryItem('Total Unloading (Kgs)', (summary['totalUnloadingKgs'] as double?)?.toStringAsFixed(2) ?? '0.00', Icons.remove_circle_outline, 'unloading'),
-          _SummaryItem('Total Shortage (Kgs)', (summary['totalShortageKgs'] as double?)?.toStringAsFixed(2) ?? '0.00', Icons.report_problem, 'shortage'),
-          _SummaryItem('Utilization %', '${(summary['utilization'] as double?)?.toStringAsFixed(1) ?? '0.0'}%', Icons.pie_chart, 'utilization'),
-        ];
-
-        return Column(
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
-            companyInfo,
-            Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 1.3,
-                ),
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  return _buildSummaryCard(items[index]);
-                },
+            _buildCompanyInfoHeader(user),
+            const SizedBox(height: 18),
+
+            // Trips
+            const Text('Trips', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _tripTile(_SummaryItem('Total', totalTrips, Icons.assignment_outlined, 'totalTrips'), AppColors.ink, AppColors.mist),
+                  const SizedBox(width: 8),
+                  _tripTile(_SummaryItem('In transit', inTransit, Icons.local_shipping_outlined, 'inTransit'), AppColors.warningYellow, AppColors.inTransitBg),
+                  const SizedBox(width: 8),
+                  _tripTile(_SummaryItem('Completed', completed, Icons.check_circle_outline, 'completed'), AppColors.successGreen, AppColors.availableBg),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Weights
+            const Text('Load (kg)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Column(
+                children: [
+                  _weightRow(Icons.upload_outlined, 'Total loading', kg.format(loading)),
+                  const Divider(height: 1, indent: 56),
+                  _weightRow(Icons.download_outlined, 'Total unloading', kg.format(unloading)),
+                  const Divider(height: 1, indent: 56),
+                  _weightRow(
+                    Icons.warning_amber_rounded,
+                    'Total shortage',
+                    kg.format(shortage),
+                    note: '${shortagePct.toStringAsFixed(2)}% of loading',
+                    color: shortage > 0 ? AppColors.errorRed : AppColors.ink,
+                    onTap: () => _onSummaryTap(_SummaryItem('Shortage', '', Icons.warning_amber_rounded, 'shortage')),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Utilization
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('Fleet utilization', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      ),
+                      Text('${utilization.toStringAsFixed(1)}%',
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: utilization / 100,
+                      minHeight: 10,
+                      backgroundColor: AppColors.mist,
+                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.brandYellow),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('Share of vehicles currently on a trip',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                ],
               ),
             ),
           ],
@@ -182,34 +252,82 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
     );
   }
 
-  Widget _buildSummaryCard(_SummaryItem item) {
-    return InkWell(
-      onTap: () => _onSummaryTap(item),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+  /// One of three equal trip tiles; tap opens the trip list.
+  Widget _tripTile(_SummaryItem item, Color color, Color tint) {
+    return Expanded(
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: AppColors.divider),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _onSummaryTap(item),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(10)),
+                  child: Icon(item.icon, size: 18, color: color),
+                ),
+                const SizedBox(height: 10),
+                Text(item.value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: color)),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(item.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    ),
+                    const Icon(Icons.chevron_right, size: 16, color: AppColors.textSecondary),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _weightRow(IconData icon, String label, String value,
+      {String? note, Color color = AppColors.ink, VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
           children: [
-            Icon(item.icon, color: AppColors.primaryDark, size: 24),
-            const SizedBox(height: 12),
-            Text(item.label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            const SizedBox(height: 4),
-            Text(item.value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-            const SizedBox(height: 4),
-            const Icon(Icons.arrow_forward_ios, size: 10, color: AppColors.primaryMid),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(color: AppColors.mist, borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, size: 16, color: color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(fontSize: 14)),
+                  if (note != null)
+                    Text(note, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+            Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: color)),
+            if (onTap != null) ...[
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right, size: 18, color: AppColors.textSecondary),
+            ],
           ],
         ),
       ),
@@ -498,7 +616,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildDetailRow('Driver', t.driverUserId),
+                                _buildDetailRow('Driver', driverNameOf(ref, t.driverUserId)),
                                 _buildDetailRow('Status', t.status.toUpperCase()),
                                 if (t.completedAt != null)
                                   _buildDetailRow('Completed', t.formattedCompletedAt),
@@ -630,16 +748,82 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
             child: ElevatedButton.icon(
               onPressed: _selectedVehicleNumber == null ? null : _exportReport,
               icon: const Icon(Icons.picture_as_pdf),
-              label: const Text('EXPORT REPORT'),
+              label: const Text('EXPORT PDF'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryDark,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                backgroundColor: AppColors.brandYellow,
+                foregroundColor: AppColors.onBrandYellow,
+                disabledBackgroundColor: AppColors.divider,
+                disabledForegroundColor: AppColors.textSecondary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _selectedVehicleNumber == null || _exportingExcel ? null : _exportExcel,
+              icon: _exportingExcel
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.table_chart_outlined),
+              label: const Text('EXPORT EXCEL'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.ink,
+                side: const BorderSide(color: AppColors.ink, width: 1.5),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.5),
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  bool _exportingExcel = false;
+
+  /// Same data as the PDF, as an Excel sheet shared through WhatsApp, email, Drive etc.
+  Future<void> _exportExcel() async {
+    if (_selectedVehicleNumber == null) return;
+    final fromDate = _fromDate ?? DateTime.now().subtract(const Duration(days: 30));
+    final toDate = _toDate ?? DateTime.now();
+    setState(() => _exportingExcel = true);
+    try {
+      final report = await ref.read(reportRepositoryProvider).getVehicleMonthlyReport(
+            vehicleNumber: _selectedVehicleNumber!,
+            companyCode: ref.read(authStateProvider).value!.companyCode,
+            fromDate: fromDate,
+            toDate: toDate,
+          );
+      final trips = report['tripDetails'] == null
+          ? <Map<String, dynamic>>[]
+          : List<Map<String, dynamic>>.from(report['tripDetails']);
+      if (trips.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('No trips found for this vehicle in the selected period'),
+            backgroundColor: AppColors.errorRed,
+          ));
+        }
+        return;
+      }
+      await ExcelExporter.shareVehicleReport(
+        businessName: await currentBusinessName(ref),
+        vehicleNumber: _selectedVehicleNumber!,
+        fromDate: fromDate,
+        toDate: toDate,
+        trips: trips,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating Excel file: $e'), backgroundColor: AppColors.errorRed),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exportingExcel = false);
+    }
   }
 
   Future<void> _exportReport() async {
@@ -688,6 +872,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
   }
 
   Widget _buildCompanyInfoHeader(dynamic user) {
+    final businessName = ref.watch(businessNameProvider).value;
     return FutureBuilder(
       future: Supabase.instance.client
           .from(SupabaseConstants.tableCompanies)
@@ -696,47 +881,37 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
           .maybeSingle(),
       builder: (context, snapshot) {
         final company = snapshot.data;
+        final name = businessName ?? company?['company_name'] as String? ?? 'Your business';
         return Container(
           width: double.infinity,
-          margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.primaryDark,
-            borderRadius: BorderRadius.circular(12),
+            color: AppColors.ink,
+            borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
             children: [
-              const Icon(Icons.business, color: Colors.white, size: 28),
-              const SizedBox(width: 12),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(color: AppColors.brandYellow, borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.local_shipping_rounded, color: AppColors.ink, size: 26),
+              ),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      company?['company_name'] as String? ?? 'Company',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white),
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on_outlined, color: Colors.white70, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          company?['state_code'] as String? ?? 'N/A',
-                          style: const TextStyle(fontSize: 12, color: Colors.white70),
-                        ),
-                        const SizedBox(width: 16),
-                        const Icon(Icons.pin_drop_outlined, color: Colors.white70, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          company?['company_code'] as String? ?? 'N/A',
-                          style: const TextStyle(fontSize: 12, color: Colors.white70),
-                        ),
-                      ],
+                    Text(
+                      'State ${company?['state_code'] ?? '–'}  ·  Company code ${company?['company_code'] ?? '–'}',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFFD1D3D8)),
                     ),
                   ],
                 ),

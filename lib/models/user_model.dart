@@ -14,6 +14,7 @@ class UserModel {
   final DateTime createdAt;
   final String? drivingLicenseUrl;
   final String? aadhaarCardUrl;
+  final DateTime? licenseExpiry;
 
   const UserModel({
     required this.id,
@@ -29,6 +30,7 @@ class UserModel {
     required this.createdAt,
     this.drivingLicenseUrl,
     this.aadhaarCardUrl,
+    this.licenseExpiry,
   });
 
   UserModel copyWith({
@@ -45,6 +47,7 @@ class UserModel {
     DateTime? createdAt,
     String? drivingLicenseUrl,
     String? aadhaarCardUrl,
+    DateTime? licenseExpiry,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -60,6 +63,7 @@ class UserModel {
       createdAt: createdAt ?? this.createdAt,
       drivingLicenseUrl: drivingLicenseUrl ?? this.drivingLicenseUrl,
       aadhaarCardUrl: aadhaarCardUrl ?? this.aadhaarCardUrl,
+      licenseExpiry: licenseExpiry ?? this.licenseExpiry,
     );
   }
 
@@ -78,6 +82,7 @@ class UserModel {
       createdAt: DateTime.parse(json['created_at'] as String),
       drivingLicenseUrl: json['driving_license_url'] as String?,
       aadhaarCardUrl: json['aadhaar_card_url'] as String?,
+      licenseExpiry: json['license_expiry'] != null ? DateTime.tryParse(json['license_expiry'] as String) : null,
     );
   }
 
@@ -98,6 +103,18 @@ class UserModel {
       'aadhaar_card_url': aadhaarCardUrl,
     };
   }
+
+  /// Days until the driving licence expires (negative = already expired), or null if not set.
+  int? get licenseDaysLeft {
+    if (licenseExpiry == null) return null;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final exp = DateTime(licenseExpiry!.year, licenseExpiry!.month, licenseExpiry!.day);
+    return exp.difference(today).inDays;
+  }
+
+  /// Expired or expiring within 30 days.
+  bool get licenseNeedsAttention => licenseDaysLeft != null && licenseDaysLeft! <= 30;
 
   String get formattedCreatedAt {
     final istDate = createdAt.toUtc().add(const Duration(hours: 5, minutes: 30));

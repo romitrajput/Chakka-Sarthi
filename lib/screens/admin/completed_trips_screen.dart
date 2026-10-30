@@ -13,6 +13,7 @@ import 'package:sanjay_roadlines_fleet/repositories/ticket_repository.dart';
 import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
 import 'package:sanjay_roadlines_fleet/core/widgets/reassignment_history.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/detention.dart';
+import 'package:sanjay_roadlines_fleet/providers/driver_names_provider.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class CompletedTripsScreen extends ConsumerStatefulWidget {
@@ -44,6 +45,7 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(driverNamesProvider); // redraw when driver names load
     final ticketsAsync = ref.watch(completedTicketsProvider);
     final currentLocale = ref.watch(languageProvider);
 
@@ -198,7 +200,7 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
                 },
               ),
               const SizedBox(height: 8),
-              _buildInfoRow(Icons.person, 'Driver', ticket.driverUserId),
+              _buildInfoRow(Icons.person, 'Driver', driverNameOf(ref, ticket.driverUserId)),
               const SizedBox(height: 8),
               _buildInfoRow(Icons.event_available, 'Assigned', ticket.formattedAssignedAt),
               const SizedBox(height: 8),
@@ -303,7 +305,7 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
                   // Trip Info
                   _buildDetailRow('Trip ID', ticket.ticketId),
                   _buildDetailRow('Vehicle', vehicleNumber),
-                  _buildDetailRow('Driver', ticket.driverUserId),
+                  _buildDetailRow('Driver', driverNameOf(ref, ticket.driverUserId)),
                   _buildDetailRow('Status', ticket.status.toUpperCase()),
                   _buildDetailRow('Assigned', ticket.formattedAssignedAt),
                   _buildDetailRow('Completed', ticket.formattedCompletedAt),

@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/local_notification_service.dart';
 import 'package:sanjay_roadlines_fleet/models/user_model.dart';
+import 'package:sanjay_roadlines_fleet/core/utils/push_service.dart';
 import 'package:sanjay_roadlines_fleet/repositories/auth_repository.dart';
 
 part 'auth_provider.g.dart';
@@ -22,6 +23,7 @@ class AuthState extends _$AuthState {
         if (user != null) {
           // Start listening for notifications
           LocalNotificationService.startListening(user.userId);
+          PushService.registerForCurrentUser();
         }
         return user;
       } catch (_) {
@@ -43,6 +45,7 @@ class AuthState extends _$AuthState {
       // Start listening for notifications
       if (user != null) {
         LocalNotificationService.startListening(user.userId);
+        PushService.registerForCurrentUser();
       }
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
@@ -61,6 +64,7 @@ class AuthState extends _$AuthState {
       // Start listening for notifications
       if (user != null) {
         LocalNotificationService.startListening(user.userId);
+        PushService.registerForCurrentUser();
       }
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);

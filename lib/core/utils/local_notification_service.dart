@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_mlkit_translation/google_mlkit_translation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
+import 'package:sanjay_roadlines_fleet/core/utils/push_service.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/translation_service.dart';
 
 class LocalNotificationService {
@@ -15,7 +16,7 @@ class LocalNotificationService {
   static Future<void> initialize() async {
     if (_isInitialized) return;
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings('@drawable/ic_stat_notify');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -29,6 +30,19 @@ class LocalNotificationService {
 
     await _plugin.initialize(initSettings);
     _isInitialized = true;
+
+    // Android 13+ only shows notifications after the user allows them
+    try {
+      final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      // Same channel Firebase uses for notifications that arrive while the app is closed
+      await android?.createNotificationChannel(const AndroidNotificationChannel(
+        'fleet_channel',
+        'Trip notifications',
+        description: 'Trip assignments, loading and unloading updates',
+        importance: Importance.high,
+      ));
+      await android?.requestNotificationsPermission();
+    } catch (_) {}
   }
 
   static Future<void> showNotification({
@@ -44,8 +58,8 @@ class LocalNotificationService {
       channelDescription: 'Notifications for fleet management events',
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
-      color: Color(0xFF14161F),
+      icon: '@drawable/ic_stat_notify',
+      color: Color(0xFFFFD23F),
     );
 
     const iosDetails = DarwinNotificationDetails(
@@ -114,6 +128,12 @@ class LocalNotificationService {
           final shown = await _loadShownIds();
           if (shown.contains(id)) return; // already popped up once
           await _rememberShown(id);
+
+          // App in the background with Firebase set up: Firebase already shows it
+          if (PushService.isReady &&
+              WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+            return;
+          }
 
           final title = notif['title'] as String? ?? 'Notification';
           final message = notif['message'] as String? ?? '';

@@ -26,6 +26,10 @@ class AuthRepository {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userKey);
     await prefs.remove(_rememberKey);
+    try {
+      await _client.rpc('save_fcm_token', params: {'p_token': ''}); // stop pushes to this phone
+      await _client.rpc('app_logout');
+    } catch (_) {}
     await Supabase.instance.client.auth.signOut();
   }
 
@@ -36,72 +40,40 @@ class AuthRepository {
     return prefs.getString(_userKey);
   }
 
+  /// Makes sure this phone has a (hidden) Supabase session before talking to the database.
+  Future<void> _ensureSession() async {
+    if (_client.auth.currentUser == null) {
+      await _client.auth.signInAnonymously();
+    }
+  }
+
+  /// Login is checked on the server (app_login), which also links this phone to the user.
+  Future<UserModel> _serverLogin(String userId, {String? mobile, String? mpinHash}) async {
+    await _ensureSession();
+    try {
+      final res = await _client.rpc('app_login', params: {
+        'p_user_id': userId.trim(),
+        'p_mobile': mobile?.trim(),
+        'p_mpin_hash': mpinHash,
+      });
+      return UserModel.fromJson(Map<String, dynamic>.from(res as Map));
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
   Future<UserModel?> loginWithPassword(
       String userId, String mobile, {bool remember = false}) async {
-    try {
-      final response = await _client
-          .from(SupabaseConstants.tableUsers)
-          .select('id, user_id, full_name, mobile, role, company_code, mpin_hash, is_first_login, is_active, sequential_num, created_at')
-          .eq('user_id', userId.trim())
-          .eq('mobile', mobile.trim())
-          .eq('is_active', true)
-          .maybeSingle();
-
-      if (response == null) {
-        throw Exception('Invalid User ID or mobile number');
-      }
-
-      final user = UserModel.fromJson(response);
-      // Allow mobile login only on first login
-      if (!user.isFirstLogin) {
-        throw Exception('MPIN already set. Please login using your MPIN');
-      }
-
-      await saveSession(user.userId, remember: remember);
-
-// Create Supabase Auth session
-      if (Supabase.instance.client.auth.currentUser == null) {
-        await Supabase.instance.client.auth.signInAnonymously();
-      }
-
-      return user;
-    } catch (e) {
-      rethrow;
-    }
+    final user = await _serverLogin(userId, mobile: mobile);
+    await saveSession(user.userId, remember: remember);
+    return user;
   }
 
   Future<UserModel?> loginWithMpin(
       String userId, String mpin, {bool remember = false}) async {
-    try {
-      final hashedMpin = _hash(mpin.trim());
-      final response = await _client
-          .from(SupabaseConstants.tableUsers)
-          .select('id, user_id, full_name, mobile, role, company_code, mpin_hash, is_first_login, is_active, sequential_num, created_at')
-          .eq('user_id', userId.trim())
-          .eq('mpin_hash', hashedMpin)
-          .eq('is_active', true)
-          .maybeSingle();
-
-      if (response == null) {
-        throw Exception('Invalid User ID or MPIN');
-      }
-
-      final user = UserModel.fromJson(response);
-      if (user.isFirstLogin) {
-        throw Exception('Please login with mobile number first to set your MPIN');
-      }
-
-      await saveSession(user.userId, remember: remember);
-
-// Create Supabase Auth session
-      if (Supabase.instance.client.auth.currentUser == null) {
-        await Supabase.instance.client.auth.signInAnonymously();
-      }
-
-      return user;
-    } catch (e) {
-      rethrow;
-    }
+    final user = await _serverLogin(userId, mpinHash: _hash(mpin.trim()));
+    await saveSession(user.userId, remember: remember);
+    return user;
   }
 
   Future<void> setMpin(String userId, String mpin) async {
@@ -131,7 +103,7 @@ class AuthRepository {
     try {
       final response = await _client
           .from(SupabaseConstants.tableUsers)
-          .select('id, user_id, full_name, mobile, role, company_code, mpin_hash, is_first_login, is_active, sequential_num, created_at')
+          .select('id, user_id, full_name, mobile, role, company_code, is_first_login, is_active, sequential_num, created_at')
           .eq('user_id', userId)
           .maybeSingle();
 
@@ -142,22 +114,10 @@ class AuthRepository {
     }
   }
 
-  /// Verify super admin reset code for a company
+  /// Verify super admin reset code for a company (checked on the server)
   Future<bool> verifyResetCode(String companyCode, String resetCode) async {
-    try {
-      final response = await _client
-          .from(SupabaseConstants.tableCompanies)
-          .select('reset_code')
-          .eq('company_code', companyCode)
-          .maybeSingle();
-
-      if (response == null) return false;
-      final storedCode = response['reset_code'] as String?;
-      if (storedCode == null || storedCode.isEmpty) return false;
-      return storedCode == resetCode;
-    } catch (e) {
-      rethrow;
-    }
+    final res = await _client.rpc('verify_reset_code', params: {'p_code': resetCode});
+    return res == true;
   }
 
   /// Reset all company data (vehicles, tickets, notifications, etc.)

@@ -5,6 +5,7 @@ import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/app_translations.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/local_notification_service.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/translation_service.dart';
+import 'package:sanjay_roadlines_fleet/core/utils/push_service.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 void main() async {
@@ -17,6 +18,9 @@ void main() async {
 
   // Initialize local notifications
   await LocalNotificationService.initialize();
+
+  // Notifications while the app is closed (needs Firebase set up; skipped otherwise)
+  await PushService.init();
 
   // Load saved language preference
   final savedLanguage = await AppTranslations.loadLanguage();
