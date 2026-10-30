@@ -701,7 +701,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
           margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF1B4F72),
+            color: AppColors.primaryDark,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:sanjay_roadlines_fleet/models/ticket_model.dart';
 import 'package:sanjay_roadlines_fleet/models/loading_status_model.dart';
 import 'package:sanjay_roadlines_fleet/models/unloading_status_model.dart';
+import 'package:sanjay_roadlines_fleet/core/utils/detention.dart';
 
 class PdfGenerator {
   // Chakka Saarthi brand colours (from the logo)
@@ -14,6 +15,30 @@ class PdfGenerator {
   static const PdfColor _road = PdfColor.fromInt(0xFF2A2E3B);
   static const PdfColor _yellow = PdfColor.fromInt(0xFFFFD23F);
   static const PdfColor _mist = PdfColor.fromInt(0xFFF4F4F0);
+
+  // ---- Date helpers (all shown in Indian time, e.g. "29 Oct 2026, 10:34 PM") ----
+  static DateTime _ist(DateTime d) => d.toUtc().add(const Duration(hours: 5, minutes: 30));
+  static DateTime? _parse(dynamic v) {
+    if (v is DateTime) return v;
+    if (v is String && v.isNotEmpty) return DateTime.tryParse(v);
+    return null;
+  }
+  /// Date and time, for moments (assigned, completed, loading time)
+  static String _dateTime(dynamic v) {
+    final d = _parse(v);
+    return d == null ? 'N/A' : DateFormat('dd MMM yyyy, hh:mm a').format(_ist(d));
+  }
+  /// Date only, for days the driver picked (reporting, unloading)
+  static String _dateOnly(dynamic v) {
+    final d = _parse(v);
+    return d == null ? 'N/A' : DateFormat('dd MMM yyyy').format(_ist(d));
+  }
+  /// Detention for one consolidated-report trip: worked out from its dates, else the saved value
+  static int _tripDetention(Map<String, dynamic> t) {
+    return calculateDetentionDays(_parse(t['reportingDate']), _parse(t['unloadingDate'])) ??
+        (t['detentionDays'] as int?) ??
+        0;
+  }
 
   static Future<pw.MemoryImage?> _loadLogo() async {
     try {
@@ -112,7 +137,7 @@ class PdfGenerator {
     final logo = await _loadLogo();
     final theme = _pageTheme(font);
     final now = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
-    final formattedNow = DateFormat('dd-MM-yyyy, hh:mm a').format(now);
+    final formattedNow = DateFormat('dd MMM yyyy, hh:mm a').format(now);
 
     pdf.addPage(
       pw.Page(
@@ -133,7 +158,7 @@ class PdfGenerator {
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Request ID: ${ticket.ticketId}', style: pw.TextStyle(font: font, fontSize: 10)),
+                  pw.Text('Trip ID: ${ticket.ticketId}', style: pw.TextStyle(font: font, fontSize: 10)),
                   pw.Text('Generated: $formattedNow', style: pw.TextStyle(font: font, fontSize: 10)),
                 ],
               ),
@@ -142,7 +167,7 @@ class PdfGenerator {
               // SECTION A - Trip Details
               _buildSectionHeader('TRIP DETAILS', boldFont),
               _buildTable([
-                ['Ticket ID', ticket.ticketId],
+                ['Trip ID', ticket.ticketId],
                 ['Assigned Date', ticket.formattedAssignedAt],
                 ['Driver Name', loading.driverName],
                 ['Vehicle Number', loading.vehicleNumber],
@@ -159,7 +184,7 @@ class PdfGenerator {
                 ['Consignee', loading.consigneeName],
                 ['Product', loading.product],
                 ['Loading Weight (Kgs)', '${loading.loadingWeightKgs.toStringAsFixed(2)} Kgs'],
-                ['Loading Date', DateFormat('dd-MM-yyyy').format(loading.creationDate)],
+                ['Loading Date', _dateTime(loading.creationDate)],
               ], font, boldFont),
               pw.SizedBox(height: 20),
 
@@ -167,21 +192,22 @@ class PdfGenerator {
               _buildSectionHeader('UNLOADING DETAILS', boldFont),
               _buildTable([
                 ['Unloading Weight (Kgs)', '${unloading.unloadingWeightKgs.toStringAsFixed(2)} Kgs'],
-                ['Unloading Date', DateFormat('dd-MM-yyyy').format(unloading.unloadingDate)],
+                ['Unloading Date', _dateOnly(unloading.unloadingDate)],
                 ['Shortage (Kgs)', '${unloading.shortageKgs.toStringAsFixed(2)} Kgs'],
               ], font, boldFont),
               pw.SizedBox(height: 20),
 
               // SECTION D - Reporting & Detention
-              if (ticket.reportingDate != null || ticket.detentionDays != null)
-                pw.Column(
+              pw.Column(
                   children: [
                     _buildSectionHeader('REPORTING & DETENTION', boldFont),
                     _buildTable([
-                      if (ticket.reportingDate != null)
-                        ['Reporting Date', DateFormat('dd-MM-yyyy').format(ticket.reportingDate!)],
-                      if (ticket.detentionDays != null)
-                        ['Detention Days', '${ticket.detentionDays} day(s)'],
+                      ['Reporting Date', _dateOnly(ticket.reportingDate)],
+                      ['Unloading Date', _dateOnly(unloading.unloadingDate)],
+                      [
+                        'Detention Days',
+                        '${calculateDetentionDays(ticket.reportingDate, unloading.unloadingDate) ?? ticket.detentionDays ?? 0} day(s)',
+                      ],
                     ], font, boldFont),
                     pw.SizedBox(height: 20),
                   ],
@@ -217,7 +243,7 @@ class PdfGenerator {
     final logo = await _loadLogo();
     final theme = _pageTheme(font);
     final now = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
-    final formattedNow = DateFormat('dd-MM-yyyy, hh:mm a').format(now);
+    final formattedNow = DateFormat('dd MMM yyyy, hh:mm a').format(now);
 
     // Calculate totals
     double totalLoading = 0;
@@ -249,12 +275,12 @@ class PdfGenerator {
               _buildSectionHeader('REPORT SUMMARY', boldFont),
               _buildTable([
                 ['Vehicle Number', vehicleNumber],
-                ['Report Period', '${DateFormat('dd-MM-yyyy').format(fromDate)} to ${DateFormat('dd-MM-yyyy').format(toDate)}'],
+                ['Report Period', '${DateFormat('dd MMM yyyy').format(fromDate)} to ${DateFormat('dd MMM yyyy').format(toDate)}'],
                 ['Total Trips', '${tripDetails.length}'],
                 ['Total Loading (Kgs)', totalLoading.toStringAsFixed(2)],
                 ['Total Unloading (Kgs)', totalUnloading.toStringAsFixed(2)],
                 ['Total Shortage (Kgs)', totalShortage.toStringAsFixed(2)],
-                ['Total Detention Days', '${tripDetails.fold<int>(0, (sum, t) => sum + ((t['detentionDays'] as int?) ?? 0))} day(s)'],
+                ['Total Detention Days', '${tripDetails.fold<int>(0, (sum, t) => sum + _tripDetention(t))} day(s)'],
                 ['Report Generated', formattedNow],
               ], font, boldFont),
             ],
@@ -281,7 +307,7 @@ class PdfGenerator {
                 cellAlignment: pw.Alignment.centerLeft,
                 headerAlignment: pw.Alignment.centerLeft,
                 cellHeight: 24,
-                headers: ['#', 'Ticket ID', 'Assigned', 'Completed', 'Loading', 'Unloading', 'Shortage', 'Detention'],
+                headers: ['#', 'Trip ID', 'Driver', 'Assigned', 'Completed', 'Loading (kg)', 'Unloading (kg)', 'Shortage (kg)', 'Detention'],
                 data: tripDetails.asMap().entries.map((entry) {
                   final i = entry.key + 1;
                   final t = entry.value;
@@ -318,12 +344,13 @@ class PdfGenerator {
                   return [
                     '$i',
                     (t['ticketId'] as String?) ?? '',
+                    (t['driverName'] as String?) ?? (t['driverUserId'] as String?) ?? '',
                     assignedStr,
                     completedStr,
                     '${((t['loadingKgs'] as double?) ?? 0).toStringAsFixed(1)}',
                     '${((t['unloadingKgs'] as double?) ?? 0).toStringAsFixed(1)}',
                     '${((t['shortageKgs'] as double?) ?? 0).toStringAsFixed(1)}',
-                    '${t['detentionDays'] ?? 0}d',
+                    '${_tripDetention(t)} day(s)',
                   ];
                 }).toList(),
               ),
@@ -362,12 +389,12 @@ class PdfGenerator {
                 // Trip basic info
                 _buildSectionHeader('TRIP DETAILS', boldFont),
                 _buildTable([
-                  ['Ticket ID', trip['ticketId'] as String? ?? ''],
+                  ['Trip ID', trip['ticketId'] as String? ?? ''],
                   ['Vehicle', vehicleNumber],
                   ['Driver', trip['driverName'] as String? ?? trip['driverUserId'] as String? ?? ''],
                   ['Assigned By', trip['createdBy'] as String? ?? ''],
-                  ['Assigned At', _formatDbDate(trip['assignedAt'])],
-                  ['Completed At', _formatDbDate(trip['completedAt'])],
+                  ['Assigned At', _dateTime(trip['assignedAt'])],
+                  ['Completed At', _dateTime(trip['completedAt'])],
                 ], font, boldFont),
                 pw.SizedBox(height: 14),
 
@@ -380,7 +407,7 @@ class PdfGenerator {
                   ['Consignee', trip['consigneeName'] as String? ?? 'N/A'],
                   ['Product', trip['product'] as String? ?? 'N/A'],
                   ['Loading Weight (Kgs)', '${((trip['loadingKgs'] as double?) ?? 0).toStringAsFixed(2)} Kgs'],
-                  ['Loading Date', trip['loadingDate'] as String? ?? 'N/A'],
+                  ['Loading Date', _dateTime(trip['loadingDate'])],
                 ], font, boldFont),
                 pw.SizedBox(height: 14),
 
@@ -388,22 +415,20 @@ class PdfGenerator {
                 _buildSectionHeader('UNLOADING DETAILS', boldFont),
                 _buildTable([
                   ['Unloading Weight (Kgs)', '${((trip['unloadingKgs'] as double?) ?? 0).toStringAsFixed(2)} Kgs'],
-                  ['Unloading Date', trip['unloadingDate'] as String? ?? 'N/A'],
+                  ['Unloading Date', _dateOnly(trip['unloadingDate'])],
                   ['Shortage (Kgs)', '${((trip['shortageKgs'] as double?) ?? 0).toStringAsFixed(2)} Kgs'],
                 ], font, boldFont),
                 pw.SizedBox(height: 14),
 
                 // Reporting & Detention
-                if (trip['reportingDate'] != null || (trip['detentionDays'] as int?) != null)
-                  pw.Column(
+                pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       _buildSectionHeader('REPORTING & DETENTION', boldFont),
                       _buildTable([
-                        if (trip['reportingDate'] != null)
-                          ['Reporting Date', trip['reportingDate'] as String? ?? 'N/A'],
-                        if ((trip['detentionDays'] as int?) != null)
-                          ['Detention Days', '${trip['detentionDays']} day(s)'],
+                        ['Reporting Date', _dateOnly(trip['reportingDate'])],
+                        ['Unloading Date', _dateOnly(trip['unloadingDate'])],
+                        ['Detention Days', '${_tripDetention(trip)} day(s)'],
                       ], font, boldFont),
                     ],
                   ),
@@ -426,12 +451,12 @@ class PdfGenerator {
               pw.SizedBox(height: 10),
               _buildTable([
                 ['Vehicle Number', vehicleNumber],
-                ['Report Period', '${DateFormat('dd-MM-yyyy').format(fromDate)} to ${DateFormat('dd-MM-yyyy').format(toDate)}'],
+                ['Report Period', '${DateFormat('dd MMM yyyy').format(fromDate)} to ${DateFormat('dd MMM yyyy').format(toDate)}'],
                 ['Total Trips Completed', '${tripDetails.length}'],
                 ['Total Loading (Kgs)', totalLoading.toStringAsFixed(2)],
                 ['Total Unloading (Kgs)', totalUnloading.toStringAsFixed(2)],
                 ['Total Shortage (Kgs)', totalShortage.toStringAsFixed(2)],
-                ['Total Detention Days', '${tripDetails.fold<int>(0, (sum, t) => sum + ((t['detentionDays'] as int?) ?? 0))} day(s)'],
+                ['Total Detention Days', '${tripDetails.fold<int>(0, (sum, t) => sum + _tripDetention(t))} day(s)'],
                 ['Average Loading/Trip (Kgs)', tripDetails.isNotEmpty ? (totalLoading / tripDetails.length).toStringAsFixed(2) : '0.00'],
                 ['Average Unloading/Trip (Kgs)', tripDetails.isNotEmpty ? (totalUnloading / tripDetails.length).toStringAsFixed(2) : '0.00'],
               ], font, boldFont),
@@ -450,18 +475,6 @@ class PdfGenerator {
     );
 
     return pdf.save();
-  }
-
-  /// Format date from DB (ISO string) to IST display format
-  static String _formatDbDate(String? dateStr) {
-    if (dateStr == null || dateStr.isEmpty) return 'N/A';
-    try {
-      final date = DateTime.parse(dateStr);
-      final istDate = date.toUtc().add(const Duration(hours: 5, minutes: 30));
-      return DateFormat('dd MMM yyyy').format(istDate);
-    } catch (_) {
-      return dateStr;
-    }
   }
 
   static pw.Widget _buildSectionHeader(String title, pw.Font font) {

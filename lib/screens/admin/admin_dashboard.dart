@@ -24,8 +24,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   @override
   void initState() {
     super.initState();
-    // Show the welcome card for ~1.5 seconds after login, then animate it away
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    // Show the welcome card for 6 seconds after login, then animate it away
+    Future.delayed(const Duration(seconds: 6), () {
       if (mounted) setState(() => _showWelcome = false);
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _askBusinessNameIfMissing());
@@ -265,10 +265,10 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                         child: CustomPaint(
                           painter: _DonutChartPainter(
                             segments: [
-                              _ChartSegment(inTransitCount.toDouble(), const Color(0xFF27AE60)),
-                              _ChartSegment(availableCount.toDouble(), const Color(0xFF2874A6)),
-                              _ChartSegment(completedTodayCount.toDouble(), const Color(0xFF8E44AD)),
-                              _ChartSegment(maintenanceCount.toDouble(), const Color(0xFFE67E22)),
+                              _ChartSegment(inTransitCount.toDouble(), AppColors.brandYellow),
+                              _ChartSegment(availableCount.toDouble(), AppColors.goGreen),
+                              _ChartSegment(completedTodayCount.toDouble(), AppColors.roadGrey),
+                              _ChartSegment(maintenanceCount.toDouble(), AppColors.workshopOrange),
                             ],
                           ),
                           child: Center(
@@ -290,10 +290,10 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildLegendItem('In Transit', '$inTransitCount', const Color(0xFF27AE60)),
-                            _buildLegendItem('Available', '$availableCount', const Color(0xFF2874A6)),
-                            _buildLegendItem('Completed', '$completedTodayCount', const Color(0xFF8E44AD)),
-                            _buildLegendItem('Maintenance', '$maintenanceCount', const Color(0xFFE67E22)),
+                            _buildLegendItem('In Transit', '$inTransitCount', AppColors.brandYellow),
+                            _buildLegendItem('Available', '$availableCount', AppColors.goGreen),
+                            _buildLegendItem('Completed', '$completedTodayCount', AppColors.roadGrey),
+                            _buildLegendItem('Maintenance', '$maintenanceCount', AppColors.workshopOrange),
                           ],
                         ),
                       ),
@@ -337,15 +337,16 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     'Create New Trip',
                     'Plan & create a new trip',
                     Icons.add_road,
-                    const Color(0xFF1B4F72),
+                    AppColors.primaryDark,
                     () => context.push('/admin/create-ticket'),
+                    highlight: true,
                   ),
                   _buildMenuCard(
                     context,
                     'Re-assign Driver',
                     'Reassign active trips',
                     Icons.swap_horiz,
-                    const Color(0xFFE67E22),
+                    AppColors.primaryDark,
                     () => context.push('/admin/assigned-tickets'),
                     badge: assignedCount,
                   ),
@@ -354,7 +355,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     'In Transit',
                     'View ongoing trips',
                     Icons.local_shipping_outlined,
-                    const Color(0xFFE67E22),
+                    AppColors.primaryDark,
                     () => context.push('/admin/in-transit'),
                     badge: inTransitCount,
                   ),
@@ -363,7 +364,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     'Completed Trips',
                     'View trip history',
                     Icons.task_alt,
-                    const Color(0xFF27AE60),
+                    AppColors.primaryDark,
                     () => context.push('/admin/completed-trips'),
                     badge: completedTodayCount,
                   ),
@@ -372,7 +373,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     'Vehicles',
                     'Available & maintenance',
                     Icons.directions_car_filled,
-                    const Color(0xFF2874A6),
+                    AppColors.primaryDark,
                     () => context.push('/admin/vehicles-available'),
                     badge: availableCount,
                   ),
@@ -381,7 +382,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     'Maintenance',
                     'Manage vehicle maintenance',
                     Icons.build_circle_outlined,
-                    const Color(0xFFE67E22),
+                    AppColors.primaryDark,
                     () => context.push('/admin/maintenance'),
                     badge: maintenanceCount,
                   ),
@@ -390,7 +391,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     'Dashboard',
                     'Analytics & fleet overview',
                     Icons.analytics_outlined,
-                    const Color(0xFF8E44AD),
+                    AppColors.primaryDark,
                     () => context.push('/admin/reports'),
                   ),
                 ];
@@ -512,13 +513,14 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     );
   }
 
-  Widget _buildMenuCard(BuildContext context, String title, String subtitle, IconData icon, Color color, VoidCallback onTap, {int? badge}) {
+  Widget _buildMenuCard(BuildContext context, String title, String subtitle, IconData icon, Color color, VoidCallback onTap, {int? badge, bool highlight = false}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          // The main action (Create New Trip) is brand yellow; the rest are white
+          color: highlight ? AppColors.brandYellow : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: color.withValues(alpha: 0.12)),
           boxShadow: [
@@ -532,14 +534,10 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [color.withValues(alpha: 0.2), color.withValues(alpha: 0.08)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: highlight ? AppColors.ink : color.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: color, size: 20),
+              child: Icon(icon, color: highlight ? AppColors.brandYellow : color, size: 20),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -549,7 +547,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                 children: [
                   Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                   const SizedBox(height: 2),
-                  Text(subtitle, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary, height: 1.3)),
+                  Text(subtitle, style: TextStyle(fontSize: 10, color: highlight ? AppColors.ink : AppColors.textSecondary, height: 1.3)),
                 ],
               ),
             ),

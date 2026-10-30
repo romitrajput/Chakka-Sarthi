@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
+import 'package:sanjay_roadlines_fleet/core/utils/detention.dart';
 import 'package:sanjay_roadlines_fleet/models/ticket_model.dart';
 
 class TicketRepository {
@@ -223,35 +224,31 @@ class TicketRepository {
     }
   }
 
-  // UPDATE REPORTING DATE
+  // UPDATE REPORTING DATE (+ detention days = unloading date − reporting date)
   Future<void> updateReportingDate({
     required String ticketId,
     required DateTime reportingDate,
+    DateTime? unloadingDate,
   }) async {
     try {
-      // Calculate detention days (unloading date - reporting date)
-      final ticket = await getTicketById(ticketId);
-      int? detentionDays;
-      
-      // Get unloading date from unloading_status table
-      final unloadingRes = await _client
-          .from(SupabaseConstants.tableUnloadingStatus)
-          .select('unloading_date')
-          .eq('ticket_id', ticketId)
-          .maybeSingle();
-      
-      if (unloadingRes != null && reportingDate != null) {
-        final unloadingDate = DateTime.parse(unloadingRes['unloading_date'] as String);
-        if (unloadingDate.isBefore(reportingDate)) {
-          detentionDays = reportingDate.difference(unloadingDate).inDays;
-        }
+      // Use the unloading date passed in; otherwise look it up
+      DateTime? unloading = unloadingDate;
+      if (unloading == null) {
+        final unloadingRes = await _client
+            .from(SupabaseConstants.tableUnloadingStatus)
+            .select('unloading_date')
+            .eq('ticket_id', ticketId)
+            .maybeSingle();
+        final raw = unloadingRes?['unloading_date'] as String?;
+        if (raw != null) unloading = DateTime.tryParse(raw);
       }
+      final detentionDays = calculateDetentionDays(reportingDate, unloading);
 
       await _client
           .from(SupabaseConstants.tableTickets)
           .update({
             'reporting_date': reportingDate.toUtc().toIso8601String(),
-            if (detentionDays != null)      'retention_days': detentionDays, // Days between unloading and reporting
+            if (detentionDays != null) 'retention_days': detentionDays,
           })
           .eq('ticket_id', ticketId);
     } catch (e) {

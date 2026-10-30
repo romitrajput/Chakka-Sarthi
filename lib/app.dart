@@ -21,6 +21,7 @@ import 'package:sanjay_roadlines_fleet/screens/admin/assigned_tickets_screen.dar
 import 'package:sanjay_roadlines_fleet/screens/driver/assigned_ticket_screen.dart';
 import 'package:sanjay_roadlines_fleet/screens/driver/ticket_detail_screen.dart';
 import 'package:sanjay_roadlines_fleet/screens/driver/loading_form_screen.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:sanjay_roadlines_fleet/screens/driver/unloading_form_screen.dart';
 
 // LANGUAGE PROVIDER
@@ -163,40 +164,7 @@ class _AppState extends ConsumerState<App> {
       routerConfig: router,
       title: AppStrings.appName,
       locale: currentLocale,
-      theme: ThemeData(
-        useMaterial3: true,
-        primaryColor: AppColors.primaryDark,
-        scaffoldBackgroundColor: AppColors.background,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.primaryDark,
-          primary: AppColors.primaryDark,
-          secondary: AppColors.primaryMid,
-          surface: AppColors.surface,
-          error: AppColors.errorRed,
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: AppColors.primaryDark,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          centerTitle: false,
-          titleTextStyle: TextStyle(
-              fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
-        ),
-        cardTheme: CardThemeData(
-          color: AppColors.surface,
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryDark,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-      ),
+      theme: _chakkaSaarthiTheme(),
     );
   }
 }
@@ -209,4 +177,95 @@ class _AuthStateListenable extends ChangeNotifier {
       }
     });
   }
+}
+
+/// Chakka Saarthi theme: ink top bars, brand-yellow main buttons,
+/// mist background, Space Grotesk font (from the brand kit).
+ThemeData _chakkaSaarthiTheme() {
+  final base = ThemeData(
+    useMaterial3: true,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: AppColors.ink,
+      primary: AppColors.ink,
+      onPrimary: Colors.white,
+      secondary: AppColors.brandYellow,
+      onSecondary: AppColors.onBrandYellow,
+      surface: AppColors.surface,
+      onSurface: AppColors.textPrimary,
+      error: AppColors.errorRed,
+    ),
+  );
+  final textTheme = GoogleFonts.spaceGroteskTextTheme(base.textTheme).apply(
+    bodyColor: AppColors.textPrimary,
+    displayColor: AppColors.textPrimary,
+  );
+  return base.copyWith(
+    primaryColor: AppColors.ink,
+    scaffoldBackgroundColor: AppColors.background,
+    textTheme: textTheme,
+    dividerColor: AppColors.divider,
+    appBarTheme: AppBarTheme(
+      backgroundColor: AppColors.ink,
+      foregroundColor: Colors.white,
+      elevation: 0,
+      centerTitle: false,
+      titleTextStyle: GoogleFonts.spaceGrotesk(
+          fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white),
+    ),
+    cardTheme: CardThemeData(
+      color: AppColors.surface,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: AppColors.divider),
+      ),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.brandYellow,
+        foregroundColor: AppColors.onBrandYellow,
+        elevation: 0,
+        textStyle: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w700),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.ink,
+        side: const BorderSide(color: AppColors.ink, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: AppColors.ink),
+    ),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: AppColors.brandYellow,
+      foregroundColor: AppColors.onBrandYellow,
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.divider),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.divider),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.ink, width: 2),
+      ),
+    ),
+    checkboxTheme: CheckboxThemeData(
+      fillColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected) ? AppColors.ink : null,
+      ),
+    ),
+    progressIndicatorTheme: const ProgressIndicatorThemeData(color: AppColors.ink),
+    snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
+  );
 }

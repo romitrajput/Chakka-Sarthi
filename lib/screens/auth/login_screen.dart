@@ -537,8 +537,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             onPressed:
                                 (_isLoggingIn || authState.isLoading) ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primaryDark,
-                              foregroundColor: Colors.white,
+                              backgroundColor: AppColors.brandYellow,
+                              foregroundColor: AppColors.onBrandYellow,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14)),
@@ -548,7 +548,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     width: 22,
                                     height: 22,
                                     child: CircularProgressIndicator(
-                                        color: Colors.white, strokeWidth: 2),
+                                        color: AppColors.onBrandYellow, strokeWidth: 2),
                                   )
                                 : Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -688,7 +688,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: const Color(0xFFD4AF37), size: screenW * 0.065),
+        Icon(icon, color: AppColors.primaryDark, size: screenW * 0.065),
         SizedBox(height: MediaQuery.of(context).size.height * 0.005),
         Text(
           label,

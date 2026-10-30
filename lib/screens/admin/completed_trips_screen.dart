@@ -12,6 +12,7 @@ import 'package:sanjay_roadlines_fleet/repositories/loading_unloading_repository
 import 'package:sanjay_roadlines_fleet/repositories/ticket_repository.dart';
 import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
 import 'package:sanjay_roadlines_fleet/core/widgets/reassignment_history.dart';
+import 'package:sanjay_roadlines_fleet/core/utils/detention.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class CompletedTripsScreen extends ConsumerStatefulWidget {
@@ -300,7 +301,7 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
                   const SizedBox(height: 16),
 
                   // Trip Info
-                  _buildDetailRow('Ticket ID', ticket.ticketId),
+                  _buildDetailRow('Trip ID', ticket.ticketId),
                   _buildDetailRow('Vehicle', vehicleNumber),
                   _buildDetailRow('Driver', ticket.driverUserId),
                   _buildDetailRow('Status', ticket.status.toUpperCase()),
@@ -308,9 +309,13 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
                   _buildDetailRow('Completed', ticket.formattedCompletedAt),
 
                   if (ticket.reportingDate != null)
-                    _buildDetailRow('Reporting Date', DateFormat('dd MMM yyyy').format(ticket.reportingDate!)),
-                  if (ticket.detentionDays != null)
-                    _buildDetailRow('Detention Days', '${ticket.detentionDays} days'),
+                    _buildDetailRow('Reporting Date', DateFormat('dd MMM yyyy').format(ticket.reportingDate!.toUtc().add(const Duration(hours: 5, minutes: 30)))),
+                  if (unloadingStatus != null)
+                    _buildDetailRow('Unloading Date', DateFormat('dd MMM yyyy').format(unloadingStatus.unloadingDate.toUtc().add(const Duration(hours: 5, minutes: 30)))),
+                  _buildDetailRow(
+                    'Detention Days',
+                    '${calculateDetentionDays(ticket.reportingDate, unloadingStatus?.unloadingDate) ?? ticket.detentionDays ?? 0} day(s)',
+                  ),
 
                   if (ticket.reassignmentCount > 0) ...[
                     const Divider(height: 32),

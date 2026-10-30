@@ -45,7 +45,7 @@ class LocalNotificationService {
       importance: Importance.high,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
-      color: Color(0xFF1B4F72),
+      color: Color(0xFF14161F),
     );
 
     const iosDetails = DarwinNotificationDetails(

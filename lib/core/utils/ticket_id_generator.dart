@@ -3,12 +3,13 @@ import 'package:intl/intl.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 
 class TicketIdGenerator {
-  /// Generates Ticket ID in format: SRL DDMMYYYY-001
-  /// Example: SRL 30082026-001
-  static Future<String> generate(String companyCode) async {
+  /// Generates the Trip ID: <company short name> DDMMYYYY-001
+  /// Example: MT 30082026-001 (short name comes from the companies table)
+  static Future<String> generate(String companyShortName) async {
     final now = DateTime.now();
     final dateStr = DateFormat('ddMMyyyy').format(now);
-    final dayPrefix = 'SRL $dateStr-';
+    final prefix = companyShortName.trim().isEmpty ? 'TRIP' : companyShortName.trim().toUpperCase();
+    final dayPrefix = '$prefix $dateStr-';
 
     try {
       final response = await Supabase.instance.client

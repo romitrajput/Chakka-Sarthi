@@ -37,8 +37,9 @@ class AppButton extends StatelessWidget {
             ),
           )
         : ElevatedButton.styleFrom(
-            backgroundColor: backgroundColor ?? AppColors.primaryDark,
-            foregroundColor: textColor ?? Colors.white,
+            // Main buttons use the brand yellow with dark text
+            backgroundColor: backgroundColor ?? AppColors.brandYellow,
+            foregroundColor: textColor ?? (backgroundColor == null ? AppColors.onBrandYellow : Colors.white),
             minimumSize: Size(width ?? double.infinity, height),
             elevation: 0,
             shape: RoundedRectangleBorder(
@@ -47,12 +48,16 @@ class AppButton extends StatelessWidget {
           );
 
     final child = isLoading
-        ? const SizedBox(
+        ? SizedBox(
             height: 20,
             width: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isOutlined
+                    ? AppColors.primaryDark
+                    : (backgroundColor == null ? AppColors.onBrandYellow : Colors.white),
+              ),
             ),
           )
         : Row(

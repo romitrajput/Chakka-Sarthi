@@ -246,6 +246,7 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
       await ticketRepo.updateReportingDate(
         ticketId: widget.ticketId,
         reportingDate: _selectedReportingDate!,
+        unloadingDate: _selectedUnloadingDate,
       );
 
       // Pop-up: Reporting Date Submitted

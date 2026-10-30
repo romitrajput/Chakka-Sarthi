@@ -212,7 +212,7 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF1B4F72), Color(0xFF2874A6)],
+                      colors: [AppColors.ink, AppColors.roadGrey],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
