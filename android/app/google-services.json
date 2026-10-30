@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "522261286360",
+    "project_id": "chakka-saarthi-f9b50",
+    "storage_bucket": "chakka-saarthi-f9b50.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:522261286360:android:e781f941dc97e877e6f6ad",
+        "android_client_info": {
+          "package_name": "com.chakkasaarthi.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8tubiVLcTD7XXt_mZPQ5SeXgZvAYFmbU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
