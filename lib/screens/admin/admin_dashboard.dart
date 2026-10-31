@@ -10,6 +10,7 @@ import 'package:sanjay_roadlines_fleet/providers/vehicle_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/licence_alerts_provider.dart';
 import 'package:sanjay_roadlines_fleet/models/user_model.dart';
+import 'package:sanjay_roadlines_fleet/core/utils/backup_exporter.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class AdminDashboard extends ConsumerStatefulWidget {
@@ -656,6 +657,16 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                   context.push('/admin/manage-vehicles');
                 },
               ),
+              ListTile(
+                leading: const Icon(Icons.backup_outlined, color: AppColors.primaryDark),
+                title: const Text('Backup data'),
+                subtitle: const Text('Download everything as an Excel file'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _runBackup(context);
+                },
+              ),
               const Divider(height: 16),
               ListTile(
                 leading: const Icon(Icons.logout, color: AppColors.errorRed),
@@ -670,6 +681,39 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         ),
       ),
     );
+  }
+
+  Future<void> _runBackup(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Expanded(child: Text('Preparing backup…')),
+          ],
+        ),
+      ),
+    );
+    bool dialogOpen = true;
+    try {
+      final name = await currentBusinessName(ref);
+      final (file, summary) = await BackupExporter.buildFullBackup(businessName: name);
+      navigator.pop(); // close "preparing" before the share sheet opens
+      dialogOpen = false;
+      await BackupExporter.share(file, name);
+      messenger.showSnackBar(SnackBar(
+        content: Text('Backup ready ($summary). Save it somewhere safe, e.g. Google Drive.'),
+        backgroundColor: AppColors.successGreen,
+      ));
+    } catch (e) {
+      if (dialogOpen) navigator.pop();
+      messenger.showSnackBar(SnackBar(content: Text('Backup failed: $e'), backgroundColor: AppColors.errorRed));
+    }
   }
 
   void _confirmLogout(BuildContext context, WidgetRef ref) {

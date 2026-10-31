@@ -16,6 +16,7 @@ class TicketRepository {
     required String companyCode,
     required String createdBy,
     String? createdByUserId,
+    DateTime? assignedAt, // driver self-assignment: the date they picked
   }) async {
     try {
       final active = await _client
@@ -44,7 +45,7 @@ class TicketRepository {
         'driver_user_id': driverUserId,
         'company_code': companyCode,
         'status': 'assigned',
-        'assigned_at': DateTime.now().toUtc().toIso8601String(),
+        'assigned_at': (assignedAt ?? DateTime.now()).toUtc().toIso8601String(),
         'created_by': createdBy,
         if (createdByUserId != null) 'created_by_user_id': createdByUserId,
       });

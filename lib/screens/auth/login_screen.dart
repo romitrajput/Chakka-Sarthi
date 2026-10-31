@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -449,9 +450,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               onPressed: () => setState(() => _obscureUserId = !_obscureUserId),
                             ),
                           ),
-                          validator: (v) => v == null || v.isEmpty
-                              ? (_isMpinMode ? 'Enter your User ID or mobile number' : 'User ID is required')
-                              : null,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return _isMpinMode ? 'Enter your User ID or mobile number' : 'User ID is required';
+                            }
+                            final t = v.trim();
+                            if (RegExp(r'^\d+$').hasMatch(t) && t.length != 10) {
+                              return 'Mobile number must be 10 digits';
+                            }
+                            return null;
+                          },
                         ),
                         SizedBox(height: screenH * 0.014),
 
@@ -463,7 +471,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           controller: _passwordController,
                           obscureText: _obscurePassword,
                           keyboardType: TextInputType.number,
-                          maxLength: _isMpinMode ? 4 : null,
+                          maxLength: _isMpinMode ? 4 : 10, // MPIN 4 digits, mobile 10 digits
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           style: TextStyle(
                               fontSize: screenW * 0.035, letterSpacing: 2),
                           decoration: _inputDecoration(
@@ -495,6 +504,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             }
                             if (_isMpinMode && v.length != 4) {
                               return 'MPIN must be exactly 4 digits';
+                            }
+                            if (!_isMpinMode && v.length != 10) {
+                              return 'Mobile number must be 10 digits';
                             }
                             return null;
                           },

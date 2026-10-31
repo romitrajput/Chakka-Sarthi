@@ -102,7 +102,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
     final picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
-      firstDate: DateTime(2020),
+      firstDate: DateTime(2020), // list filter: past dates allowed
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (picked != null) {
@@ -311,7 +311,7 @@ class _AddMaintenanceSheetState extends ConsumerState<AddMaintenanceSheet> {
                       final date = await showDatePicker(
                         context: context,
                         initialDate: DateTime.now(),
-                        firstDate: DateTime(2020),
+                        firstDate: DateUtils.dateOnly(DateTime.now()), // no back-dated maintenance
                         lastDate: DateTime.now().add(const Duration(days: 365)),
                       );
                       if (date != null) {
@@ -334,7 +334,7 @@ class _AddMaintenanceSheetState extends ConsumerState<AddMaintenanceSheet> {
                       final date = await showDatePicker(
                         context: context,
                         initialDate: _fromDate ?? DateTime.now(),
-                        firstDate: _fromDate ?? DateTime.now(),
+                        firstDate: _fromDate ?? DateUtils.dateOnly(DateTime.now()),
                         lastDate: DateTime.now().add(const Duration(days: 365)),
                       );
                       if (date != null) {

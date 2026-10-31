@@ -19,6 +19,7 @@ import 'package:sanjay_roadlines_fleet/screens/admin/assigned_tickets_screen.dar
 import 'package:sanjay_roadlines_fleet/providers/driver_names_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:sanjay_roadlines_fleet/providers/licence_alerts_provider.dart';
+import 'package:sanjay_roadlines_fleet/core/widgets/secure_image.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 
 final allDriversProvider = FutureProvider<List<UserModel>>((ref) async {
@@ -216,9 +217,8 @@ class _ManageDriversScreenState extends ConsumerState<ManageDriversScreen> {
               child: InteractiveViewer(
                 maxScale: 5,
                 child: Center(
-                  child: Image.network(
-                    // cache-buster so a re-uploaded document is not shown stale
-                    '$url${url.contains('?') ? '&' : '?'}t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}',
+                  child: SecureImage(
+                    url,
                     fit: BoxFit.contain,
                     loadingBuilder: (c, child, progress) => progress == null
                         ? child
@@ -226,7 +226,7 @@ class _ManageDriversScreenState extends ConsumerState<ManageDriversScreen> {
                     errorBuilder: (c, e, s) => const Padding(
                       padding: EdgeInsets.all(24),
                       child: Text(
-                        'Could not load this document. Check that the "driver-documents" storage bucket is public in Supabase.',
+                        'Could not load this document. Check your internet connection and try again.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.white),
                       ),

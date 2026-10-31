@@ -40,6 +40,8 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
   bool _isSubmitting = false;
   String _loadingWeightDisplay = '...';
   DateTime? _selectedReportingDate;
+  DateTime? _loadingDate; // reporting date can't be before this
+  final _consignerController = TextEditingController();
   DateTime? _selectedUnloadingDate;
   final List<Uint8List> _challanImages = [];
   final ImagePicker _picker = ImagePicker();
@@ -58,6 +60,7 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
       final loading = await repo.getLoadingStatus(widget.ticketId);
       if (loading != null && mounted) {
         setState(() {
+          _loadingDate = loading.creationDate;
           _loadingWeight = loading.loadingWeightKgs;
           _loadingWeightDisplay =
               '${loading.loadingWeightKgs.toStringAsFixed(2)} Kgs';
@@ -130,11 +133,17 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
   }
 
   Future<void> _pickReportingDate() async {
+    // Reporting date must be on or after the loading date
+    final today = DateUtils.dateOnly(DateTime.now());
+    final loadingDay = _loadingDate == null
+        ? DateTime(2020)
+        : DateUtils.dateOnly(_loadingDate!.toUtc().add(const Duration(hours: 5, minutes: 30)));
+    final first = loadingDay.isAfter(today) ? today : loadingDay;
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      initialDate: _selectedReportingDate ?? today,
+      firstDate: first,
+      lastDate: today,
     );
     if (picked != null) {
       setState(() {
@@ -267,6 +276,7 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
           unloading: unloadingStatus,
           companyName: await currentBusinessName(ref),
           unloadedBy: user.fullName,
+          consignerName: _consignerController.text.trim(),
           driverChanges: await ReportRepository().driverChangeLines(widget.ticketId),
         );
       } catch (_) {
@@ -284,7 +294,10 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
       try {
         await Supabase.instance.client
             .from(SupabaseConstants.tableUnloadingStatus)
-            .update({'unloaded_by': user.fullName})
+            .update({
+              'unloaded_by': user.fullName,
+              'consigner_name': _consignerController.text.trim(),
+            })
             .eq('ticket_id', widget.ticketId);
       } catch (_) {}
 
@@ -306,7 +319,7 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
           targetUserId: adminId,
           title: 'Trip Completed',
           message:
-              'Trip ${widget.ticketId} completed by ${user.fullName}. Shortage: ${_shortage.toStringAsFixed(2)} Kgs',
+              '${loading.vehicleNumber} · ${user.fullName} · Trip ${widget.ticketId} · Shortage: ${_shortage.toStringAsFixed(2)} Kgs',
           ticketId: widget.ticketId,
         );
       }
@@ -342,6 +355,7 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
     _weightController.removeListener(_recalcShortage);
     _weightController.dispose();
     _reportingDateController.dispose();
+    _consignerController.dispose();
     _unloadingDateController.dispose();
     super.dispose();
   }
@@ -439,6 +453,43 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
                           return 'Weight must be a numeric value';
                         return null;
                       },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // CONSIGNER NAME (same style as Consignee Name in the loading form)
+                    Text(
+                      currentLocale.languageCode == 'hi' ? 'प्रेषक का नाम' : 'Consigner Name',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _consignerController,
+                      textCapitalization: TextCapitalization.words,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: currentLocale.languageCode == 'hi' ? 'प्रेषक का नाम लिखें' : 'Enter consigner name',
+                        prefixIcon: const Icon(Icons.business_outlined, size: 20, color: AppColors.textSecondary),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.divider),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.divider),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.primaryDark, width: 1.5),
+                        ),
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Consigner name is required' : null,
                     ),
                     const SizedBox(height: 16),
 

@@ -12,6 +12,7 @@ import 'package:sanjay_roadlines_fleet/providers/ticket_provider.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/local_notification_service.dart';
 import 'package:sanjay_roadlines_fleet/repositories/auth_repository.dart';
 import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
+import 'package:sanjay_roadlines_fleet/screens/driver/self_assign_sheet.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class DriverDashboard extends ConsumerStatefulWidget {
@@ -311,7 +312,55 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
+
+            // Self-assign a trip (shown below the trips assigned by the admin)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Material(
+                color: AppColors.brandYellow,
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                    builder: (_) => SelfAssignSheet(hindi: currentLocale.languageCode == 'hi'),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(color: AppColors.ink, borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.add, color: AppColors.brandYellow),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                currentLocale.languageCode == 'hi' ? 'स्वयं यात्रा लें' : 'Self-assign a trip',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ink),
+                              ),
+                              Text(
+                                currentLocale.languageCode == 'hi' ? 'वाहन और तिथि चुनें' : 'Pick a vehicle and the trip date',
+                                style: const TextStyle(fontSize: 12, color: AppColors.ink),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right, color: AppColors.ink),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
             const SizedBox(height: 24),
           ],

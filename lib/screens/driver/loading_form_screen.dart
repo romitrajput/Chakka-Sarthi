@@ -32,6 +32,8 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
 
   String _vehicleNumber = 'Loading...';
   bool _isFetching = true;
+  DateTime? _assignedAt; // the trip's assigned date: loading can't be before it
+  DateTime? _loadingDate; // chosen by the driver
   bool _isSubmitting = false;
 
   @override
@@ -45,7 +47,13 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
       final ticketRepo = ref.read(ticketRepositoryProvider);
       final ticket = await ticketRepo.getTicketById(widget.ticketId);
       final vehicleNum = await ticketRepo.getVehicleNumber(ticket.vehicleId);
-      if (mounted) setState(() {_vehicleNumber = vehicleNum; _isFetching = false;});
+      if (mounted) {
+        setState(() {
+          _vehicleNumber = vehicleNum;
+          _assignedAt = ticket.assignedAt;
+          _isFetching = false;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() {_vehicleNumber = 'Unknown'; _isFetching = false;});
     }
@@ -65,6 +73,14 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_isFetching) return;
+    if (_loadingDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please select the loading date'),
+        backgroundColor: AppColors.errorRed,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
 
     // Check if this driver still owns this ticket (after potential reassignment)
     final user = ref.read(authStateProvider).value;
@@ -100,7 +116,7 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
         consigneeName: _consigneeController.text.trim(),
         product: _productController.text.trim(),
         loadingWeightKgs: double.parse(_weightController.text.trim()),
-        creationDate: now,
+        creationDate: _loadingDate!.toUtc(), // date chosen by the driver
         submittedAt: now,
       );
 
@@ -116,8 +132,7 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
         await notifRepo.sendNotification(
           targetUserId: adminId,
           title: 'Trip Started',
-          message:
-              '${user.fullName} started trip ${widget.ticketId} from ${model.journeyFrom} to ${model.journeyTo}',
+          message: '$_vehicleNumber · ${user.fullName} · Trip ${widget.ticketId}',
           ticketId: widget.ticketId,
         );
       }
@@ -147,8 +162,6 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(authStateProvider).value;
     final currentLocale = ref.watch(languageProvider);
-    final formattedDate = DateFormat('dd MMM yyyy').format(
-        DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30)));
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -174,7 +187,23 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
                     const Divider(height: 20),
                     _readOnlyRow(Icons.person, currentLocale.languageCode == 'hi' ? 'चालक का नाम' : 'Driver Name', user?.fullName ?? ''),
                     const Divider(height: 20),
-                    _readOnlyRow(Icons.calendar_today, currentLocale.languageCode == 'hi' ? 'तिथि' : 'Date (Auto-captured)', formattedDate),
+                    InkWell(
+                      onTap: _pickLoadingDate,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _readOnlyRow(
+                              Icons.calendar_today,
+                              currentLocale.languageCode == 'hi' ? 'लोडिंग तिथि' : 'Loading Date (tap to select)',
+                              _loadingDate == null
+                                  ? (currentLocale.languageCode == 'hi' ? 'तिथि चुनें' : 'Select date')
+                                  : DateFormat('dd MMM yyyy').format(_loadingDate!),
+                            ),
+                          ),
+                          const Icon(Icons.edit_calendar_outlined, color: AppColors.primaryDark),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -187,11 +216,11 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
                 _lrController,
                 Icons.numbers,
                 digitsOnly: true,
-                maxLength: 12,
+                maxLength: 5,
               ),
               _field(currentLocale.languageCode == 'hi' ? 'यात्रा कहां से' : 'Journey From', _fromController, Icons.location_on_outlined),
               _field(currentLocale.languageCode == 'hi' ? 'यात्रा कहां तक' : 'Journey To', _toController, Icons.flag_outlined),
-              _field(currentLocale.languageCode == 'hi' ? 'प्रेषक का नाम' : 'Consigner Name', _consigneeController, Icons.business_outlined),
+              _field(currentLocale.languageCode == 'hi' ? 'प्राप्तकर्ता का नाम' : 'Consignee Name', _consigneeController, Icons.business_outlined),
               _field(currentLocale.languageCode == 'hi' ? 'उत्पाद' : 'Product', _productController, Icons.inventory_2_outlined),
               _field(currentLocale.languageCode == 'hi' ? 'लोडिंग वजन (किग्रा)' : 'Loading Weight (Kgs)', _weightController, Icons.scale_outlined,
                   isNumber: true),
@@ -235,6 +264,23 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
         ]),
       ],
     );
+  }
+
+  /// Loading date: from the trip's assigned date up to today.
+  Future<void> _pickLoadingDate() async {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final assigned = _assignedAt == null
+        ? today.subtract(const Duration(days: 30))
+        : DateUtils.dateOnly(_assignedAt!.toLocal());
+    final last = assigned.isAfter(today) ? assigned : today;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _loadingDate ?? (today.isBefore(assigned) ? assigned : today),
+      firstDate: assigned,
+      lastDate: last,
+      helpText: 'Loading date',
+    );
+    if (picked != null) setState(() => _loadingDate = picked);
   }
 
   Widget _field(String label, TextEditingController ctrl, IconData icon,

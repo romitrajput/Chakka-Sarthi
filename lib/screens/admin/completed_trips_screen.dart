@@ -15,6 +15,7 @@ import 'package:sanjay_roadlines_fleet/core/widgets/reassignment_history.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/detention.dart';
 import 'package:sanjay_roadlines_fleet/providers/driver_names_provider.dart';
 import 'package:sanjay_roadlines_fleet/repositories/report_repository.dart';
+import 'package:sanjay_roadlines_fleet/core/widgets/secure_image.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class CompletedTripsScreen extends ConsumerStatefulWidget {
@@ -261,6 +262,7 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
     final loadingRepo = LoadingUnloadingRepository();
     final loadingStatus = await loadingRepo.getLoadingStatus(ticket.ticketId);
     final unloadingStatus = await loadingRepo.getUnloadingStatus(ticket.ticketId);
+    final consigner = await ReportRepository().consignerName(ticket.ticketId);
     final vehicleNumber = await _getVehicleNumber(ticket.vehicleId);
 
     if (!mounted) return;
@@ -335,7 +337,7 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
                     _buildDetailRow('LR Number', loadingStatus.lrNumber),
                     _buildDetailRow('From', loadingStatus.journeyFrom),
                     _buildDetailRow('To', loadingStatus.journeyTo),
-                    _buildDetailRow('Consigner', loadingStatus.consigneeName),
+                    _buildDetailRow('Consignee', loadingStatus.consigneeName),
                     _buildDetailRow('Product', loadingStatus.product),
                     _buildDetailRow('Loading Weight', '${loadingStatus.loadingWeightKgs} Kgs'),
                   ],
@@ -344,6 +346,7 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
                     const Divider(height: 32),
                     const Text('Unloading Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
+                    _buildDetailRow('Consigner', (consigner == null || consigner.isEmpty) ? 'N/A' : consigner),
                     _buildDetailRow('Unloading Weight', '${unloadingStatus.unloadingWeightKgs} Kgs'),
                     _buildDetailRow('Shortage', '${unloadingStatus.shortageKgs} Kgs'),
                   ],
@@ -371,7 +374,7 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
+                                child: SecureImage(
                                   ticket.challanUrls[index],
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) {
@@ -425,7 +428,7 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
         child: Stack(
           children: [
             InteractiveViewer(
-              child: Image.network(
+              child: SecureImage(
                 imageUrl,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
@@ -494,6 +497,7 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
         unloading: unloading,
         companyName: await currentBusinessName(ref),
         unloadedBy: driverNameOf(ref, ticket.driverUserId),
+        consignerName: await ReportRepository().consignerName(ticket.ticketId),
         driverChanges: await ReportRepository().driverChangeLines(ticket.ticketId),
       );
 

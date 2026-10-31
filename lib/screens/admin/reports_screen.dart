@@ -17,6 +17,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/driver_names_provider.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/excel_exporter.dart';
+import 'package:sanjay_roadlines_fleet/core/widgets/secure_image.dart';
 import 'package:sanjay_roadlines_fleet/app.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
@@ -644,7 +645,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
                                             ),
                                             child: ClipRRect(
                                               borderRadius: BorderRadius.circular(6),
-                                              child: Image.network(t.challanUrls[i], fit: BoxFit.cover,
+                                              child: SecureImage(t.challanUrls[i], fit: BoxFit.cover,
                                                 errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, size: 20)),
                                               ),
                                             ),
@@ -682,7 +683,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
         child: Stack(
           children: [
             InteractiveViewer(
-              child: Image.network(imageUrl, fit: BoxFit.contain,
+              child: SecureImage(imageUrl, fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, size: 64)),
               ),
             ),

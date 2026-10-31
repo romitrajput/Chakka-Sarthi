@@ -44,7 +44,7 @@ class ExcelExporter {
     sheet.cell(CellIndex.indexByString('A1')).cellStyle = bold;
 
     const headers = [
-      'Trip ID', 'Vehicle', 'Loaded by', 'Unloaded by', 'Driver changes', 'Assigned', 'Completed', 'LR Number', 'From', 'To', 'Consignee', 'Product',
+      'Trip ID', 'Vehicle', 'Loaded by', 'Unloaded by', 'Driver changes', 'Assigned', 'Completed', 'LR Number', 'From', 'To', 'Consignee', 'Consigner', 'Product',
       'Loading (kg)', 'Unloading (kg)', 'Shortage (kg)', 'Reporting Date', 'Unloading Date', 'Detention (days)',
     ];
     sheet.appendRow(headers.map((h) => TextCellValue(h)).toList());
@@ -78,6 +78,7 @@ class ExcelExporter {
         TextCellValue((t['journeyFrom'] ?? '').toString()),
         TextCellValue((t['journeyTo'] ?? '').toString()),
         TextCellValue((t['consigneeName'] ?? '').toString()),
+        TextCellValue((t['consignerName'] ?? '').toString()),
         TextCellValue((t['product'] ?? '').toString()),
         DoubleCellValue(load),
         DoubleCellValue(unload),
@@ -90,7 +91,7 @@ class ExcelExporter {
 
     sheet.appendRow([
       TextCellValue('TOTAL (${trips.length} trips)'),
-      null, null, null, null, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, null, null, null, null, null, null,
       DoubleCellValue(totalLoad),
       DoubleCellValue(totalUnload),
       DoubleCellValue(totalShort),
@@ -102,7 +103,7 @@ class ExcelExporter {
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: totalRow)).cellStyle = bold;
     }
     for (var c = 0; c < headers.length; c++) {
-      sheet.setColumnWidth(c, c == 4 ? 40 : (c == 0 || c == 2 || c == 3 || c == 10 ? 22 : 16));
+      sheet.setColumnWidth(c, c == 4 ? 40 : (c == 0 || c == 2 || c == 3 || c == 10 || c == 11 ? 22 : 16));
     }
 
     final bytes = excel.save();

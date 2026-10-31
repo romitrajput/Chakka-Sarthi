@@ -46,7 +46,7 @@ class AppStrings {
   static const String scanUpload = 'Scan & Upload';
 
   // Buttons
-  static const String assignTicket = 'ASSIGN TICKET';
+  static const String assignTicket = 'ASSIGN TRIPS';
   static const String submitLoading = 'SUBMIT LOADING STATUS';
   static const String submitUnloading = 'SUBMIT UNLOADING STATUS';
   static const String markAvailable = 'Mark Available';

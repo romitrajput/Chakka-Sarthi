@@ -77,7 +77,7 @@ class AppTranslations {
       'noMaintenanceVehicles': 'No vehicles in maintenance',
       
       // Trip
-      'assignTicket': 'ASSIGN TICKET',
+      'assignTicket': 'ASSIGN TRIPS',
       'selectDriver': 'Select Driver',
       'assignVehicleDriver': 'Assign Vehicle & Driver',
       'ticketAssigned': 'Trip Assigned Successfully',

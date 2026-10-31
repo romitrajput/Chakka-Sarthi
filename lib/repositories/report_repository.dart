@@ -162,6 +162,20 @@ class ReportRepository {
     }
   }
 
+  /// Consigner name entered by the driver at unloading (null if not entered).
+  Future<String?> consignerName(String ticketId) async {
+    try {
+      final row = await _client
+          .from(SupabaseConstants.tableUnloadingStatus)
+          .select('*')
+          .eq('ticket_id', ticketId)
+          .maybeSingle();
+      return row?['consigner_name'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Map<String, String>> _namesFor(Set<String> userIds) async {
     if (userIds.isEmpty) return {};
     final users = await _client
@@ -301,6 +315,7 @@ class ReportRepository {
           'loadingDate': fullLoadingRes?['creation_date'],
           // Full unloading details
           'unloadingDate': fullUnloadingRes?['unloading_date'],
+          'consignerName': fullUnloadingRes?['consigner_name'],
         });
       }
 

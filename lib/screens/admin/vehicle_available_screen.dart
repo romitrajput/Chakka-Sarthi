@@ -341,7 +341,7 @@ class _VehicleAvailableScreenState extends ConsumerState<VehicleAvailableScreen>
                   final date = await showDatePicker(
                     context: context,
                     initialDate: DateTime.now(),
-                    firstDate: DateTime(2020),
+                    firstDate: DateUtils.dateOnly(DateTime.now()), // no back-dated maintenance
                     lastDate: DateTime.now().add(const Duration(days: 365)),
                   );
                   if (date != null) {
@@ -357,7 +357,7 @@ class _VehicleAvailableScreenState extends ConsumerState<VehicleAvailableScreen>
                   final date = await showDatePicker(
                     context: context,
                     initialDate: fromDate ?? DateTime.now(),
-                    firstDate: fromDate ?? DateTime.now(),
+                    firstDate: fromDate ?? DateUtils.dateOnly(DateTime.now()),
                     lastDate: DateTime.now().add(const Duration(days: 365)),
                   );
                   if (date != null) {
