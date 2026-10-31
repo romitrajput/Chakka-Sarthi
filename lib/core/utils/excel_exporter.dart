@@ -44,7 +44,7 @@ class ExcelExporter {
     sheet.cell(CellIndex.indexByString('A1')).cellStyle = bold;
 
     const headers = [
-      'Trip ID', 'Vehicle', 'Loaded by', 'Unloaded by', 'Driver changes', 'Assigned', 'Completed', 'LR Number', 'From', 'To', 'Consignee', 'Consigner', 'Product',
+      'Trip ID', 'Vehicle', 'Loaded by', 'Unloaded by', 'Driver changes', 'Assigned', 'Completed', 'LR Number', 'From', 'To', 'Consigner', 'Consignee', 'Product',
       'Loading (kg)', 'Unloading (kg)', 'Shortage (kg)', 'Reporting Date', 'Unloading Date', 'Detention (days)',
     ];
     sheet.appendRow(headers.map((h) => TextCellValue(h)).toList());
@@ -69,8 +69,8 @@ class ExcelExporter {
       sheet.appendRow([
         TextCellValue((t['ticketId'] ?? '').toString()),
         TextCellValue((t['vehicleNumber'] ?? vehicleNumber).toString()),
-        TextCellValue((t['loadedBy'] ?? t['driverName'] ?? '').toString()),
-        TextCellValue((t['unloadedBy'] ?? t['driverName'] ?? '').toString()),
+        TextCellValue(t['driverChanged'] == true ? '(L) ${t['loadedBy']}' : (t['loadedBy'] ?? t['driverName'] ?? '').toString()),
+        TextCellValue(t['driverChanged'] == true ? '(UL) ${t['unloadedBy']}' : (t['unloadedBy'] ?? t['driverName'] ?? '').toString()),
         TextCellValue(((t['driverChanges'] as List?) ?? const []).join('; ')),
         TextCellValue(_dateTime(t['assignedAt'])),
         TextCellValue(_dateTime(t['completedAt'])),

@@ -220,10 +220,10 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
               ),
               _field(currentLocale.languageCode == 'hi' ? 'यात्रा कहां से' : 'Journey From', _fromController, Icons.location_on_outlined),
               _field(currentLocale.languageCode == 'hi' ? 'यात्रा कहां तक' : 'Journey To', _toController, Icons.flag_outlined),
-              _field(currentLocale.languageCode == 'hi' ? 'प्राप्तकर्ता का नाम' : 'Consignee Name', _consigneeController, Icons.business_outlined),
+              _field(currentLocale.languageCode == 'hi' ? 'प्रेषक का नाम' : 'Consigner Name', _consigneeController, Icons.business_outlined),
               _field(currentLocale.languageCode == 'hi' ? 'उत्पाद' : 'Product', _productController, Icons.inventory_2_outlined),
               _field(currentLocale.languageCode == 'hi' ? 'लोडिंग वजन (किग्रा)' : 'Loading Weight (Kgs)', _weightController, Icons.scale_outlined,
-                  isNumber: true),
+                  digitsOnly: true, maxLength: 5, suffix: '.00 kg'),
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
@@ -272,7 +272,8 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
     final assigned = _assignedAt == null
         ? today.subtract(const Duration(days: 30))
         : DateUtils.dateOnly(_assignedAt!.toLocal());
-    final last = assigned.isAfter(today) ? assigned : today;
+    // Any date on or after the assigned date (earlier dates are disabled)
+    final last = (assigned.isAfter(today) ? assigned : today).add(const Duration(days: 365));
     final picked = await showDatePicker(
       context: context,
       initialDate: _loadingDate ?? (today.isBefore(assigned) ? assigned : today),
@@ -284,7 +285,7 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
   }
 
   Widget _field(String label, TextEditingController ctrl, IconData icon,
-      {bool isNumber = false, bool digitsOnly = false, int? maxLength}) {
+      {bool isNumber = false, bool digitsOnly = false, int? maxLength, String? suffix}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: TextFormField(
@@ -302,6 +303,7 @@ class _LoadingFormScreenState extends ConsumerState<LoadingFormScreen> {
         decoration: InputDecoration(
           labelText: label,
           counterText: '',
+          suffixText: suffix,
           prefixIcon: Icon(icon, size: 20, color: AppColors.textSecondary),
           filled: true,
           fillColor: Colors.white,

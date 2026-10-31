@@ -154,7 +154,7 @@ class ReportRepository {
         final when = at == null
             ? ''
             : DateFormat('dd MMM yyyy, hh:mm a').format(at.toUtc().add(const Duration(hours: 5, minutes: 30)));
-        return '${names[r['old_driver_user_id']] ?? r['old_driver_user_id']} → '
+        return '${names[r['old_driver_user_id']] ?? r['old_driver_user_id']} to '
             '${names[r['new_driver_user_id']] ?? r['new_driver_user_id']} (${stage(r['reassigned_at_stage'] as String?)}${when.isEmpty ? '' : ', $when'})';
       }).toList();
     } catch (_) {
@@ -305,9 +305,11 @@ class ReportRepository {
           'journeyTo': fullLoadingRes?['journey_to'],
           'consigneeName': fullLoadingRes?['consignee_name'],
           'product': fullLoadingRes?['product'],
+          // Different drivers: (L) = did the loading, (UL) = did the unloading
           'driverName': (loadedBy != null && unloadedBy != null && loadedBy != unloadedBy)
-              ? '$loadedBy → $unloadedBy'
+              ? '(L) $loadedBy / (UL) $unloadedBy'
               : (unloadedBy ?? loadedBy),
+          'driverChanged': loadedBy != null && unloadedBy != null && loadedBy != unloadedBy,
           'loadedBy': loadedBy,
           'unloadedBy': unloadedBy,
           'driverChanges': driverChanges,

@@ -79,6 +79,12 @@ class PdfGenerator {
     }
   }
 
+  /// "(L) Name" / "(UL) Name" when loading and unloading were done by different drivers.
+  static String _tagged(String tag, String name, String? otherDriver) {
+    if (otherDriver == null || otherDriver.isEmpty || otherDriver == name) return name;
+    return '$tag $name';
+  }
+
   /// A text value: normal PDF text, or the pre-drawn picture for Hindi etc.
   static pw.Widget _val(String text, pw.Font font, {double size = 10, bool bold = false, pw.Font? boldFont}) {
     final r = _rendered[_key(text, size, bold)];
@@ -185,7 +191,7 @@ class PdfGenerator {
   }) async {
     final pdf = pw.Document();
     await _prepare([
-      loading.driverName, unloadedBy, consignerName, loading.lrNumber, loading.journeyFrom,
+      loading.driverName, unloadedBy, '(L) ${loading.driverName}', '(UL) $unloadedBy', consignerName, loading.lrNumber, loading.journeyFrom,
       loading.journeyTo, loading.consigneeName, loading.product, ticket.createdBy,
       driverChanges.join('\n'),
     ]);
@@ -197,12 +203,10 @@ class PdfGenerator {
     final formattedNow = DateFormat('dd MMM yyyy, hh:mm a').format(now);
 
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageTheme: theme,
         build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
+          return [
               // HEADER BLOCK
               _brandHeader(
                 businessName: companyName,
@@ -226,8 +230,8 @@ class PdfGenerator {
               _buildTable([
                 ['Trip ID', ticket.ticketId],
                 ['Assigned Date', ticket.formattedAssignedAt],
-                ['Loaded by (driver)', loading.driverName],
-                ['Unloaded by (driver)', unloadedBy ?? loading.driverName],
+                ['Loaded by (driver)', _tagged('(L)', loading.driverName, unloadedBy)],
+                ['Unloaded by (driver)', _tagged('(UL)', unloadedBy ?? loading.driverName, loading.driverName)],
                 if (driverChanges.isNotEmpty) ['Driver changes', driverChanges.join('\n')],
                 ['Vehicle Number', loading.vehicleNumber],
                 ['Assigned By', ticket.createdBy],
@@ -240,7 +244,7 @@ class PdfGenerator {
                 ['LR Number', loading.lrNumber],
                 ['Journey From', loading.journeyFrom],
                 ['Journey To', loading.journeyTo],
-                ['Consignee', loading.consigneeName],
+                ['Consigner', loading.consigneeName],
                 ['Product', loading.product],
                 ['Loading Weight (Kgs)', '${loading.loadingWeightKgs.toStringAsFixed(2)} Kgs'],
                 ['Loading Date', _dateOnly(loading.creationDate)],
@@ -250,7 +254,7 @@ class PdfGenerator {
               // SECTION C - Unloading Details
               _buildSectionHeader('UNLOADING DETAILS', boldFont),
               _buildTable([
-                ['Consigner', (consignerName == null || consignerName.isEmpty) ? 'N/A' : consignerName],
+                ['Consignee', (consignerName == null || consignerName.isEmpty) ? 'N/A' : consignerName],
                 ['Unloading Weight (Kgs)', '${unloading.unloadingWeightKgs.toStringAsFixed(2)} Kgs'],
                 ['Unloading Date', _dateOnly(unloading.unloadingDate)],
                 ['Shortage (Kgs)', '${unloading.shortageKgs.toStringAsFixed(2)} Kgs'],
@@ -273,15 +277,14 @@ class PdfGenerator {
                   ],
                 ),
 
-              pw.Spacer(),
+              pw.SizedBox(height: 12),
               pw.Center(
                 child: pw.Text(
                   'This is a system-generated document.',
                   style: pw.TextStyle(font: font, fontSize: 8, color: PdfColors.grey, fontStyle: pw.FontStyle.italic),
                 ),
               ),
-            ],
-          );
+            ];
         },
       ),
     );
@@ -313,7 +316,8 @@ class PdfGenerator {
     final tableTexts = <String>[];
     for (final t in tripDetails) {
       detailTexts.addAll([
-        s(t['loadedBy']), s(t['unloadedBy']), s(t['driverName']), s(t['createdBy']), s(t['lrNumber']),
+        s(t['loadedBy']), s(t['unloadedBy']), '(L) ${s(t['loadedBy'])}', '(UL) ${s(t['unloadedBy'])}',
+        s(t['driverName']), s(t['createdBy']), s(t['lrNumber']),
         s(t['journeyFrom']), s(t['journeyTo']), s(t['consigneeName']), s(t['consignerName']), s(t['product']),
         ((t['driverChanges'] as List?) ?? const []).join('\n'),
       ]);
@@ -368,8 +372,8 @@ class PdfGenerator {
 
     // TRIP SUMMARY TABLE PAGE (landscape so all columns fit)
     final headers = <String>[
-      '#', 'Trip ID', if (allVehicles) 'Vehicle', 'Driver', 'Consignee', 'Consigner',
-      'Assigned', 'Completed', 'Loading (kg)', 'Unloading (kg)', 'Shortage (kg)', 'Detention',
+      '#', 'Trip ID', if (allVehicles) 'Vehicle', 'Driver', 'Consigner', 'Consignee',
+      'Loading Date', 'Unloading Date', 'Loading (kg)', 'Unloading (kg)', 'Shortage (kg)', 'Detention',
     ];
     pw.Widget cell(String text, {bool header = false}) => pw.Padding(
           padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 5),
@@ -402,10 +406,10 @@ class PdfGenerator {
                     s(t['ticketId']),
                     if (allVehicles) s(t['vehicleNumber']),
                     s(t['driverName'] ?? t['driverUserId']),
-                    s(t['consigneeName']),
-                    s(t['consignerName']),
-                    _dateOnly(t['assignedAt']),
-                    _dateOnly(t['completedAt']),
+                    s(t['consigneeName']), // entered at loading (Consigner)
+                    s(t['consignerName']), // entered at unloading (Consignee)
+                    _dateOnly(t['loadingDate']),
+                    _dateOnly(t['unloadingDate']),
                     ((t['loadingKgs'] as num?) ?? 0).toStringAsFixed(1),
                     ((t['unloadingKgs'] as num?) ?? 0).toStringAsFixed(1),
                     ((t['shortageKgs'] as num?) ?? 0).toStringAsFixed(1),
@@ -424,12 +428,10 @@ class PdfGenerator {
       final trip = tripDetails[i];
       
       pdf.addPage(
-        pw.Page(
+        pw.MultiPage(
           pageTheme: theme,
           build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
+            return [
                 // Trip header
                 pw.Container(
                   width: double.infinity,
@@ -450,8 +452,8 @@ class PdfGenerator {
                 _buildTable([
                   ['Trip ID', trip['ticketId'] as String? ?? ''],
                   ['Vehicle', (trip['vehicleNumber'] as String?) ?? vehicleNumber],
-                  ['Loaded by (driver)', (trip['loadedBy'] as String?) ?? (trip['driverName'] as String?) ?? ''],
-                  ['Unloaded by (driver)', (trip['unloadedBy'] as String?) ?? (trip['driverName'] as String?) ?? ''],
+                  ['Loaded by (driver)', _tagged('(L)', (trip['loadedBy'] as String?) ?? '', trip['unloadedBy'] as String?)],
+                  ['Unloaded by (driver)', _tagged('(UL)', (trip['unloadedBy'] as String?) ?? (trip['loadedBy'] as String?) ?? '', trip['loadedBy'] as String?)],
                   if ((trip['driverChanges'] as List?)?.isNotEmpty ?? false)
                     ['Driver changes', (trip['driverChanges'] as List).join('\n')],
                   ['Assigned By', trip['createdBy'] as String? ?? ''],
@@ -466,7 +468,7 @@ class PdfGenerator {
                   ['LR Number', trip['lrNumber'] as String? ?? 'N/A'],
                   ['Journey From', trip['journeyFrom'] as String? ?? 'N/A'],
                   ['Journey To', trip['journeyTo'] as String? ?? 'N/A'],
-                  ['Consignee', trip['consigneeName'] as String? ?? 'N/A'],
+                  ['Consigner', trip['consigneeName'] as String? ?? 'N/A'],
                   ['Product', trip['product'] as String? ?? 'N/A'],
                   ['Loading Weight (Kgs)', '${((trip['loadingKgs'] as double?) ?? 0).toStringAsFixed(2)} Kgs'],
                   ['Loading Date', _dateOnly(trip['loadingDate'])],
@@ -476,7 +478,7 @@ class PdfGenerator {
                 // Unloading details
                 _buildSectionHeader('UNLOADING DETAILS', boldFont),
                 _buildTable([
-                  ['Consigner', (trip['consignerName'] as String?)?.isNotEmpty == true ? trip['consignerName'] as String : 'N/A'],
+                  ['Consignee', (trip['consignerName'] as String?)?.isNotEmpty == true ? trip['consignerName'] as String : 'N/A'],
                   ['Unloading Weight (Kgs)', '${((trip['unloadingKgs'] as double?) ?? 0).toStringAsFixed(2)} Kgs'],
                   ['Unloading Date', _dateOnly(trip['unloadingDate'])],
                   ['Shortage (Kgs)', '${((trip['shortageKgs'] as double?) ?? 0).toStringAsFixed(2)} Kgs'],
@@ -495,8 +497,7 @@ class PdfGenerator {
                       ], font, boldFont),
                     ],
                   ),
-              ],
-            );
+              ];
           },
         ),
       );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -132,37 +133,61 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
     }
   }
 
+  /// Reporting date: on or after the loading date (earlier dates are disabled).
   Future<void> _pickReportingDate() async {
-    // Reporting date must be on or after the loading date
-    final today = DateUtils.dateOnly(DateTime.now());
-    final loadingDay = _loadingDate == null
-        ? DateTime(2020)
+    final first = _loadingDate == null
+        ? DateUtils.dateOnly(DateTime.now())
         : DateUtils.dateOnly(_loadingDate!.toUtc().add(const Duration(hours: 5, minutes: 30)));
-    final first = loadingDay.isAfter(today) ? today : loadingDay;
+    final last = first.add(const Duration(days: 365));
+    final today = DateUtils.dateOnly(DateTime.now());
+    var initial = _selectedReportingDate ?? today;
+    if (initial.isBefore(first)) initial = first;
+    if (initial.isAfter(last)) initial = last;
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedReportingDate ?? today,
+      initialDate: initial,
       firstDate: first,
-      lastDate: today,
+      lastDate: last,
+      helpText: 'Reporting date',
     );
     if (picked != null) {
       setState(() {
         _selectedReportingDate = picked;
         _reportingDateController.text = DateFormat('dd MMM yyyy').format(picked);
+        // Unloading can't be before reporting: clear it if it now is
+        if (_selectedUnloadingDate != null && _selectedUnloadingDate!.isBefore(picked)) {
+          _selectedUnloadingDate = null;
+          _unloadingDateController.text = '';
+        }
       });
     }
   }
 
+  /// Unloading date: on or after the reporting date (earlier dates are disabled).
   Future<void> _showDatePicker(
     BuildContext context,
     TextEditingController controller,
     String dateType,
   ) async {
+    if (_selectedReportingDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please select the reporting date first'),
+        backgroundColor: AppColors.errorRed,
+      ));
+      return;
+    }
+    final first = DateUtils.dateOnly(_selectedReportingDate!);
+    final last = first.add(const Duration(days: 365));
+    final today = DateUtils.dateOnly(DateTime.now());
+    var initial = _selectedUnloadingDate ?? today;
+    if (initial.isBefore(first)) initial = first;
+    if (initial.isAfter(last)) initial = last;
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      initialDate: initial,
+      firstDate: first,
+      lastDate: last,
+      helpText: 'Unloading date',
     );
     if (picked != null) {
       setState(() {
@@ -409,11 +434,14 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
                     // Unloading Weight input (numeric only)
                     TextFormField(
                       controller: _weightController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
+                      keyboardType: TextInputType.number,
+                      // Whole kilograms, up to 5 digits (shown with .00)
+                      maxLength: 5,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       style: const TextStyle(fontSize: 14),
                       decoration: InputDecoration(
+                        counterText: '',
+                        suffixText: '.00 kg',
                         labelText: currentLocale.languageCode == 'hi' ? 'अनलोडिंग वजन (किग्रा)' : 'Unloading Weight (Kgs)',
                         prefixIcon: const Icon(
                           Icons.scale_outlined,
@@ -458,7 +486,7 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
 
                     // CONSIGNER NAME (same style as Consignee Name in the loading form)
                     Text(
-                      currentLocale.languageCode == 'hi' ? 'प्रेषक का नाम' : 'Consigner Name',
+                      currentLocale.languageCode == 'hi' ? 'प्राप्तकर्ता का नाम' : 'Consignee Name',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -471,7 +499,7 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
                       textCapitalization: TextCapitalization.words,
                       style: const TextStyle(fontSize: 14),
                       decoration: InputDecoration(
-                        hintText: currentLocale.languageCode == 'hi' ? 'प्रेषक का नाम लिखें' : 'Enter consigner name',
+                        hintText: currentLocale.languageCode == 'hi' ? 'प्राप्तकर्ता का नाम लिखें' : 'Enter consignee name',
                         prefixIcon: const Icon(Icons.business_outlined, size: 20, color: AppColors.textSecondary),
                         filled: true,
                         fillColor: Colors.white,
@@ -489,7 +517,7 @@ class _UnloadingFormScreenState extends ConsumerState<UnloadingFormScreen> {
                           borderSide: const BorderSide(color: AppColors.primaryDark, width: 1.5),
                         ),
                       ),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Consigner name is required' : null,
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Consignee name is required' : null,
                     ),
                     const SizedBox(height: 16),
 
