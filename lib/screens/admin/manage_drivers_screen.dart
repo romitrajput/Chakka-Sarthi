@@ -425,6 +425,12 @@ class _ManageDriversScreenState extends ConsumerState<ManageDriversScreen> {
                 ),
                 const SizedBox(height: 16),
                 AppButton(
+                  text: 'LOG OUT FROM ALL DEVICES',
+                  isOutlined: true,
+                  onPressed: () => _logoutAllDevices(driver),
+                ),
+                const SizedBox(height: 16),
+                AppButton(
                   text: driver.isActive ? 'DEACTIVATE DRIVER' : 'ACTIVATE DRIVER',
                   backgroundColor: driver.isActive ? AppColors.errorRed : AppColors.successGreen,
                   onPressed: () async {
@@ -448,6 +454,34 @@ class _ManageDriversScreenState extends ConsumerState<ManageDriversScreen> {
         );
       },
     );
+  }
+
+  Future<void> _logoutAllDevices(UserModel driver) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log out from all devices?'),
+        content: Text('${driver.fullName} will be logged out of every phone and can then log in on a new phone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Log out')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await Supabase.instance.client.rpc('admin_logout_user', params: {'p_user_id': driver.userId});
+      navigator.pop();
+      messenger.showSnackBar(SnackBar(
+        content: Text('${driver.fullName} logged out from all devices'),
+        backgroundColor: AppColors.successGreen,
+      ));
+    } catch (e) {
+      final msg = e is PostgrestException ? e.message : e.toString();
+      messenger.showSnackBar(SnackBar(content: Text('Could not log out: $msg'), backgroundColor: AppColors.errorRed));
+    }
   }
 
   Future<void> _pickLicenceExpiry(UserModel driver) async {
