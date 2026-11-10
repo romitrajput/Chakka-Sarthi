@@ -48,9 +48,10 @@ android {
 
     buildTypes {
         release {
-            // Same key every build, so updates install over the old app.
-            // Falls back to a temporary key only if the secrets are missing.
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            // Always the same permanent key, so every update installs over the old app.
+            // No temporary key: a release build without the key stops with an error.
+            signingConfig = signingConfigs.findByName("release")
+                ?: throw GradleException("Signing key missing: set KEYSTORE_BASE64 and KEYSTORE_PASSWORD secrets")
             isMinifyEnabled = false
             isShrinkResources = false
         }
