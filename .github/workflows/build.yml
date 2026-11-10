@@ -13,9 +13,58 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+      - name: Prepare signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          # Every APK must be signed with the SAME permanent key, otherwise phones refuse
+          # to update ("package conflicts with an existing package"). Stop instead of
+          # building with a temporary key.
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::KEYSTORE_BASE64 / KEYSTORE_PASSWORD secrets are missing. Add them in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          keytool -list -keystore "$RUNNER_TEMP/release.jks" -storepass "$KEYSTORE_PASSWORD" > /dev/null \
+            || { echo "::error::KEYSTORE_PASSWORD does not open the keystore in KEYSTORE_BASE64"; exit 1; }
+          echo "CS_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
       - run: flutter pub get
-      - run: flutter build apk --release --build-number=${{ github.run_number }}
+      - run: flutter build apk --release --split-per-abi --build-number=${{ github.run_number }} --build-name=1.0.${{ github.run_number }}
+        env:
+          CS_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      - name: Show signing fingerprint (must be the same in every build)
+        run: keytool -printcert -jarfile build/app/outputs/flutter-apk/app-arm64-v8a-release.apk | grep -E "Owner|SHA256"
       - uses: actions/upload-artifact@v4
         with:
-          name: fleet-app-build-${{ github.run_number }}
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: chakka-saarthi-build-${{ github.run_number }}
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+      # Puts the new app online so phones show "New version available – Update"
+      - name: Publish update for phones
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::warning::SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY secrets missing - phones will not be offered this update"
+            exit 0
+          fi
+          URL="${SUPABASE_URL%/}/storage/v1/object"
+          KEY="$SUPABASE_SERVICE_ROLE_KEY"
+          H=(-H "apikey: $KEY")
+          case "$KEY" in sb_*) ;; *) H+=(-H "Authorization: Bearer $KEY") ;; esac
+          BUILD=${{ github.run_number }}
+          NAME="chakka-saarthi-$BUILD.apk"
+          curl -fsS -X POST "${H[@]}" -H "Content-Type: application/vnd.android.package-archive" -H "x-upsert: true" \
+            --data-binary @build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "$URL/app-releases/$NAME"
+          echo "{\"build\": $BUILD, \"version\": \"1.0.$BUILD\", \"apk\": \"$NAME\"}" > latest.json
+          curl -fsS -X POST "${H[@]}" -H "Content-Type: application/json" -H "x-upsert: true" -H "cache-control: max-age=60" \
+            --data-binary @latest.json "$URL/app-releases/latest.json"
+          # Keep only the newest APK in storage
+          OLD=$(curl -fsS -X POST "${H[@]}" -H "Content-Type: application/json" -d '{"prefix":"","limit":100}' "$URL/list/app-releases" \
+            | jq -c --arg keep "$NAME" '[.[].name | select(endswith(".apk") and . != $keep)]')
+          if [ -n "$OLD" ] && [ "$OLD" != "[]" ]; then
+            curl -fsS -X DELETE "${H[@]}" -H "Content-Type: application/json" -d "{\"prefixes\": $OLD}" "$URL/app-releases" > /dev/null
+          fi
+          echo "Published build $BUILD for phones"
+          
