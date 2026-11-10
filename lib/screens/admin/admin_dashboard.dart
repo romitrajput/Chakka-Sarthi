@@ -1,3 +1,4 @@
+import 'package:sanjay_roadlines_fleet/core/utils/app_updater.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,6 +36,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
       // The admin side is always English, whatever a driver chose on this phone
       ref.read(languageProvider.notifier).state = const Locale('en');
       _askBusinessNameIfMissing();
+      AppUpdater.checkForUpdate(context);
     });
   }
 
@@ -645,6 +647,16 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                 onTap: () {
                   Navigator.pop(sheetContext);
                   context.push('/admin/manage-drivers');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.admin_panel_settings_outlined, color: AppColors.primaryDark),
+                title: const Text('Manage Admins'),
+                subtitle: const Text('Add & remove admins'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  context.push('/admin/manage-admins');
                 },
               ),
               ListTile(

@@ -1,3 +1,4 @@
+import 'package:sanjay_roadlines_fleet/core/utils/app_updater.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -35,6 +36,7 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) ref.invalidate(businessNameProvider);
       _applyMyLanguage();
+      AppUpdater.checkForUpdate(context);
     });
     _pulseController = AnimationController(
       vsync: this,

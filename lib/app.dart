@@ -16,6 +16,7 @@ import 'package:sanjay_roadlines_fleet/screens/admin/vehicle_available_screen.da
 import 'package:sanjay_roadlines_fleet/screens/admin/maintenance_screen.dart';
 import 'package:sanjay_roadlines_fleet/screens/admin/reports_screen.dart';
 import 'package:sanjay_roadlines_fleet/screens/admin/manage_drivers_screen.dart';
+import 'package:sanjay_roadlines_fleet/screens/admin/manage_admins_screen.dart';
 import 'package:sanjay_roadlines_fleet/screens/admin/manage_vehicles_screen.dart';
 import 'package:sanjay_roadlines_fleet/screens/admin/assigned_tickets_screen.dart';
 import 'package:sanjay_roadlines_fleet/screens/driver/assigned_ticket_screen.dart';
@@ -103,6 +104,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/manage-drivers',
         builder: (context, state) => const ManageDriversScreen(),
+      ),
+      GoRoute(
+        path: '/admin/manage-admins',
+        builder: (context, state) => const ManageAdminsScreen(),
       ),
       GoRoute(
         path: '/admin/manage-vehicles',
