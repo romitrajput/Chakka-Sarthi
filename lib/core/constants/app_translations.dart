@@ -27,12 +27,12 @@ class AppTranslations {
       'logoutConfirm': 'Are you sure you want to logout?',
       'userId': 'User ID',
       'password': 'Password',
-      'mpin': 'MPIN',
+      'mpin': 'Login PIN',
       'enterUserId': 'Enter User ID',
       'enterPassword': 'Enter Password',
-      'enterMpin': 'Enter 4-Digit MPIN',
-      'confirmMpin': 'Confirm Your MPIN',
-      'loginWithMpin': 'Login with MPIN',
+      'enterMpin': 'Enter 4-Digit Login PIN',
+      'confirmMpin': 'Confirm Your Login PIN',
+      'loginWithMpin': 'Login with Login PIN',
       'loginWithMobile': 'Login with Mobile Number',
       
       // Dashboard
@@ -140,11 +140,11 @@ class AppTranslations {
       
       // Account Settings
       'accountSettings': 'Account Settings',
-      'resetMpin': 'Reset MPIN',
-      'resetMpinDesc': 'Reset MPIN and login with mobile number',
-      'resetMpinConfirm': 'Your MPIN will be reset. You will need to login with your mobile number to set a new MPIN. Do you want to continue?',
-      'mpinResetSuccess': 'MPIN has been reset. You can now login with your mobile number.',
-      'mpinResetFailed': 'Failed to reset MPIN',
+      'resetMpin': 'Reset Login PIN',
+      'resetMpinDesc': 'Reset Login PIN and login with mobile number',
+      'resetMpinConfirm': 'Your Login PIN will be reset. You will need to login with your mobile number to set a new Login PIN. Do you want to continue?',
+      'mpinResetSuccess': 'Login PIN has been reset. You can now login with your mobile number.',
+      'mpinResetFailed': 'Failed to reset Login PIN',
       
       // Messages
       'allClear': 'All clear!',
@@ -186,12 +186,12 @@ class AppTranslations {
       'logoutConfirm': 'क्या आप वाकई लॉगआउट करना चाहते हैं?',
       'userId': 'यूजर आईडी',
       'password': 'पासवर्ड',
-      'mpin': 'एमपिन',
+      'mpin': 'लॉगिन पिन',
       'enterUserId': 'यूजर आईडी दर्ज करें',
       'enterPassword': 'पासवर्ड दर्ज करें',
-      'enterMpin': '4 अंकों का एमपिन दर्ज करें',
-      'confirmMpin': 'अपना एमपिन पुष्टि करें',
-      'loginWithMpin': 'एमपिन से लॉगिन करें',
+      'enterMpin': '4 अंकों का लॉगिन पिन दर्ज करें',
+      'confirmMpin': 'अपना लॉगिन पिन पुष्टि करें',
+      'loginWithMpin': 'लॉगिन पिन से लॉगिन करें',
       'loginWithMobile': 'मोबाइल नंबर से लॉगिन करें',
       
       // Dashboard
@@ -299,11 +299,11 @@ class AppTranslations {
       
       // Account Settings
       'accountSettings': 'खाता सेटिंग्स',
-      'resetMpin': 'एमपिन रीसेट करें',
-      'resetMpinDesc': 'एमपिन रीसेट करें और मोबाइल नंबर से लॉगिन करें',
-      'resetMpinConfirm': 'आपका MPIN रीसेट हो जाएगा। आपको अपने मोबाइल नंबर से लॉगिन करके नया MPIN सेट करना होगा। क्या आप जारी रखना चाहते हैं?',
-      'mpinResetSuccess': 'MPIN रीसेट हो गया। अब आप मोबाइल नंबर से लॉगिन कर सकते हैं।',
-      'mpinResetFailed': 'MPIN रीसेट विफल रहा',
+      'resetMpin': 'लॉगिन पिन रीसेट करें',
+      'resetMpinDesc': 'लॉगिन पिन रीसेट करें और मोबाइल नंबर से लॉगिन करें',
+      'resetMpinConfirm': 'आपका लॉगिन पिन रीसेट हो जाएगा। आपको अपने मोबाइल नंबर से लॉगिन करके नया लॉगिन पिन सेट करना होगा। क्या आप जारी रखना चाहते हैं?',
+      'mpinResetSuccess': 'लॉगिन पिन रीसेट हो गया। अब आप मोबाइल नंबर से लॉगिन कर सकते हैं।',
+      'mpinResetFailed': 'लॉगिन पिन रीसेट विफल रहा',
       
       // Messages
       'allClear': 'सब स्पष्ट है!',
@@ -345,12 +345,12 @@ class AppTranslations {
       'logoutConfirm': 'तुम्हाला खात्रीने लॉगआउट करायचे आहे का?',
       'userId': 'यूझर आयडी',
       'password': 'पासवर्ड',
-      'mpin': 'एमपिन',
+      'mpin': 'लॉगिन पिन',
       'enterUserId': 'यूझर आयडी प्रविष्ट करा',
       'enterPassword': 'पासवर्ड प्रविष्ट करा',
-      'enterMpin': '4 अंकी एमपिन प्रविष्ट करा',
-      'confirmMpin': 'तुमचा एमपिन पुष्टी करा',
-      'loginWithMpin': 'एमपिनने लॉगिन करा',
+      'enterMpin': '4 अंकी लॉगिन पिन प्रविष्ट करा',
+      'confirmMpin': 'तुमचा लॉगिन पिन पुष्टी करा',
+      'loginWithMpin': 'लॉगिन पिनने लॉगिन करा',
       'loginWithMobile': 'मोबाइल नंबरने लॉगिन करा',
       
       // Dashboard
@@ -458,11 +458,11 @@ class AppTranslations {
       
       // Account Settings
       'accountSettings': 'खाते सेटिंग्ज',
-      'resetMpin': 'एमपिन रीसेट करा',
-      'resetMpinDesc': 'एमपिन रीसेट करा आणि मोबाइल नंबरने लॉगिन करा',
-      'resetMpinConfirm': 'तुमचा MPIN रीसेट होईल. तुम्हाला नवीन MPIN सेट करण्यासाठी मोबाइल नंबरने लॉगिन करावा लागेल. तुम्हाला सुरू ठेवायचे आहे का?',
-      'mpinResetSuccess': 'MPIN रीसेट झाला. आता तुम्ही मोबाइल नंबरने लॉगिन करू शकता.',
-      'mpinResetFailed': 'MPIN रीसेट अयशस्वी',
+      'resetMpin': 'लॉगिन पिन रीसेट करा',
+      'resetMpinDesc': 'लॉगिन पिन रीसेट करा आणि मोबाइल नंबरने लॉगिन करा',
+      'resetMpinConfirm': 'तुमचा लॉगिन पिन रीसेट होईल. तुम्हाला नवीन लॉगिन पिन सेट करण्यासाठी मोबाइल नंबरने लॉगिन करावा लागेल. तुम्हाला सुरू ठेवायचे आहे का?',
+      'mpinResetSuccess': 'लॉगिन पिन रीसेट झाला. आता तुम्ही मोबाइल नंबरने लॉगिन करू शकता.',
+      'mpinResetFailed': 'लॉगिन पिन रीसेट अयशस्वी',
       
       // Messages
       'allClear': 'सर्व स्पष्ट आहे!',

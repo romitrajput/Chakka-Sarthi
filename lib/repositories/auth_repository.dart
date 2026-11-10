@@ -47,6 +47,37 @@ class AuthRepository {
     }
   }
 
+  /// Admin "Forgot Login PIN": emails a 6-digit code. Returns the masked email it went to.
+  Future<String> sendPinResetCode(String userId, String mobile) async {
+    final res = await _pinReset({'action': 'send', 'user_id': userId.trim(), 'mobile': mobile.trim()});
+    return (res['sent_to'] as String?) ?? 'your email';
+  }
+
+  /// Admin "Forgot Login PIN": checks the emailed code and saves the new Login PIN.
+  Future<void> resetPinWithCode(String userId, String mobile, String code, String newPin) async {
+    await _pinReset({
+      'action': 'verify',
+      'user_id': userId.trim(),
+      'mobile': mobile.trim(),
+      'code': code.trim(),
+      'new_pin_hash': _hash(newPin.trim()),
+    });
+  }
+
+  Future<Map<String, dynamic>> _pinReset(Map<String, dynamic> body) async {
+    await _ensureSession();
+    final FunctionResponse res;
+    try {
+      res = await _client.functions.invoke('pin-reset', body: body);
+    } catch (_) {
+      throw Exception('Could not reach the server. Check internet and try again.');
+    }
+    final data = res.data is Map ? Map<String, dynamic>.from(res.data as Map) : <String, dynamic>{};
+    if (data['error'] != null) throw Exception(data['error']);
+    if (data['ok'] != true) throw Exception('Could not complete the request. Please try again.');
+    return data;
+  }
+
   /// Login is checked on the server (app_login), which also links this phone to the user.
   Future<UserModel> _serverLogin(String userId, {String? mobile, String? mpinHash}) async {
     await _ensureSession();

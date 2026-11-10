@@ -7,15 +7,15 @@ class AppStrings {
   static const String login = 'Login';
   static const String userId = 'User ID';
   static const String password = 'Password';
-  static const String mpin = 'MPIN';
+  static const String mpin = 'Login PIN';
   static const String enterUserId = 'Enter User ID';
   static const String enterPassword = 'Enter Password';
-  static const String enterMpin = 'Enter 4-Digit MPIN';
-  static const String confirmMpin = 'Confirm Your MPIN';
-  static const String loginWithMpin = 'Login with MPIN';
+  static const String enterMpin = 'Enter 4-Digit Login PIN';
+  static const String confirmMpin = 'Confirm Your Login PIN';
+  static const String loginWithMpin = 'Login with Login PIN';
   static const String loginWithMobile = 'Login with Mobile Number';
   static const String setMpinSubtitle = 'You will use this to login next time';
-  static const String mpinMismatch = 'MPINs do not match. Please try again.';
+  static const String mpinMismatch = 'Login PINs do not match. Please try again.';
 
   // Dashboard
   static const String createNewTrip = 'Create New Trip';
@@ -53,7 +53,7 @@ class AppStrings {
   static const String addMaintenance = 'Add to Maintenance';
   static const String addDriver = 'Add Driver';
   static const String addVehicle = 'Add Vehicle';
-  static const String resetMpin = 'Reset MPIN';
+  static const String resetMpin = 'Reset Login PIN';
   static const String exportExcel = 'Export Excel';
   static const String exportReport = 'Export Report';
   static const String reassignTrip = 'Reassign Trip';

@@ -99,7 +99,7 @@ class _SetMpinScreenState extends ConsumerState<SetMpinScreen>
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('MPIN set successfully!'),
+          content: Text('Login PIN set successfully!'),
           backgroundColor: AppColors.successGreen,
         ),
       );
@@ -156,7 +156,7 @@ class _SetMpinScreenState extends ConsumerState<SetMpinScreen>
         children: [
           const SizedBox(height: 40),
           Text(
-            _isConfirmStep ? AppStrings.confirmMpin : 'Set Your 4-Digit MPIN',
+            _isConfirmStep ? AppStrings.confirmMpin : 'Set Your 4-Digit Login PIN',
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,

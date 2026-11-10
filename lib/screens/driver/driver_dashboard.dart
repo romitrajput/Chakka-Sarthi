@@ -1,3 +1,4 @@
+import 'package:sanjay_roadlines_fleet/core/widgets/app_version_text.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/app_updater.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -371,14 +372,15 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
     );
   }
 
-  /// Settings: reset MPIN, pop-up notifications on/off, log out.
+  /// Settings: reset Login PIN, pop-up notifications on/off, log out.
   void _showDriverSettings(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheetState) => SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -422,6 +424,7 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
                     _confirmLogout(context, ref);
                   },
                 ),
+                const AppVersionText(),
               ],
             ),
           ),

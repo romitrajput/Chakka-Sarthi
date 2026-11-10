@@ -418,7 +418,7 @@ class _ManageDriversScreenState extends ConsumerState<ManageDriversScreen> {
                     if (mounted) {
                       navigator.pop();
                       scaffoldMessenger.showSnackBar(
-                        const SnackBar(content: Text('Driver MPIN reset. They must login with mobile number.'), backgroundColor: AppColors.successGreen),
+                        const SnackBar(content: Text('Driver Login PIN reset. They must login with mobile number.'), backgroundColor: AppColors.successGreen),
                       );
                     }
                   },
@@ -787,7 +787,7 @@ class _AddDriverSheetState extends ConsumerState<AddDriverSheet> {
                 const SizedBox(height: 16),
                 _credentialRow('User ID', userId),
                 const SizedBox(height: 12),
-                _credentialRow('MPIN', autoMpin),
+                _credentialRow('Login PIN', autoMpin),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(10),
@@ -801,7 +801,7 @@ class _AddDriverSheetState extends ConsumerState<AddDriverSheet> {
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Driver can login with User ID + MPIN directly. No need to set MPIN again.',
+                          'Driver can login with User ID + Login PIN directly. No need to set Login PIN again.',
                           style: TextStyle(fontSize: 11, color: Color(0xFF856404)),
                         ),
                       ),
@@ -813,7 +813,7 @@ class _AddDriverSheetState extends ConsumerState<AddDriverSheet> {
             actions: [
               TextButton(
                 onPressed: () {
-                  final text = 'User ID: $userId\nMPIN: $autoMpin';
+                  final text = 'User ID: $userId\nLogin PIN: $autoMpin';
                   Clipboard.setData(ClipboardData(text: text));
                   ScaffoldMessenger.of(dialogContext).showSnackBar(
                     const SnackBar(content: Text('Credentials copied to clipboard'), backgroundColor: AppColors.successGreen),

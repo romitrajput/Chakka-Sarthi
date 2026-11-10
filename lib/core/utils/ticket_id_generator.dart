@@ -4,7 +4,7 @@ import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 
 class TicketIdGenerator {
   /// Generates the Trip ID: <company short name> DDMMYYYY-001
-  /// Example: MT 30082026-001 (short name comes from the companies table)
+  /// Example: SRL 30082026-001 (short name comes from the companies table)
   static Future<String> generate(String companyShortName) async {
     final now = DateTime.now();
     final dateStr = DateFormat('ddMMyyyy').format(now);

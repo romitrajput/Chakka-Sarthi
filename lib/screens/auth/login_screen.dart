@@ -1,3 +1,4 @@
+import 'package:sanjay_roadlines_fleet/screens/auth/forgot_pin_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -465,7 +466,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                         // Password / MPIN
                         _buildLabel(
-                            _isMpinMode ? 'MPIN' : 'Mobile Number'),
+                            _isMpinMode ? 'Login PIN' : 'Mobile Number'),
                         SizedBox(height: screenH * 0.006),
                         TextFormField(
                           controller: _passwordController,
@@ -477,7 +478,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               fontSize: screenW * 0.035, letterSpacing: 2),
                           decoration: _inputDecoration(
                             _isMpinMode
-                                ? 'Enter 4-digit MPIN'
+                                ? 'Enter 4-digit Login PIN'
                                 : 'Enter mobile number',
                             _isMpinMode
                                 ? Icons.lock_outline
@@ -499,11 +500,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           validator: (v) {
                             if (v == null || v.isEmpty) {
                               return _isMpinMode
-                                  ? 'MPIN is required'
+                                  ? 'Login PIN is required'
                                   : 'Mobile number is required';
                             }
                             if (_isMpinMode && v.length != 4) {
-                              return 'MPIN must be exactly 4 digits';
+                              return 'Login PIN must be exactly 4 digits';
                             }
                             if (!_isMpinMode && v.length != 10) {
                               return 'Mobile number must be 10 digits';
@@ -555,6 +556,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                           ],
                         ),
+                        if (_isMpinMode)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () => ForgotPinSheet.show(context),
+                              child: Text(
+                                'Forgot Login PIN?',
+                                style: TextStyle(
+                                  fontSize: screenW * 0.033,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primaryDark,
+                                ),
+                              ),
+                            ),
+                          ),
                         SizedBox(height: screenH * 0.018),
 
                         // Login Button
@@ -641,8 +657,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               children: [
                                 Text(
                                   _isMpinMode
-                                      ? 'First time? Set up your MPIN'
-                                      : 'Back to MPIN login',
+                                      ? 'First time? Set up your Login PIN'
+                                      : 'Back to Login PIN login',
                                   style: TextStyle(
                                     fontSize: screenW * 0.038,
                                     fontWeight: FontWeight.w600,
@@ -657,7 +673,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           child: Text(
                             _isMpinMode
                                 ? 'New user: log in once with User ID + mobile number'
-                                : 'Already have an MPIN? Go back to MPIN login',
+                                : 'Already have a Login PIN? Go back to Login PIN login',
                             style: TextStyle(
                               fontSize: screenW * 0.03,
                               color: Colors.grey.shade500,

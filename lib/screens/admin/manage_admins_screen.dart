@@ -15,16 +15,24 @@ import 'package:sanjay_roadlines_fleet/providers/auth_provider.dart';
 const String kAdminIdPrefix = 'SRLTRANSPORTAD';
 const int kAdminIdNumber = 1987;
 
-final allAdminsProvider = FutureProvider<List<UserModel>>((ref) async {
+bool isValidEmail(String v) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim());
+
+/// Admin with the email used for "Forgot Login PIN" codes
+typedef AdminEntry = ({UserModel user, String? email});
+
+final allAdminsProvider = FutureProvider<List<AdminEntry>>((ref) async {
   final user = ref.watch(authStateProvider).value;
   if (user == null) return [];
   final res = await Supabase.instance.client
       .from(SupabaseConstants.tableUsers)
-      .select('id, user_id, full_name, mobile, role, company_code, is_first_login, is_active, sequential_num, created_at')
+      .select('id, user_id, full_name, mobile, email, role, company_code, is_first_login, is_active, sequential_num, created_at')
       .eq('company_code', user.companyCode)
       .eq('role', 'admin')
       .order('created_at');
-  return (res as List).map((e) => UserModel.fromJson(Map<String, dynamic>.from(e))).toList();
+  return (res as List).map((e) {
+    final m = Map<String, dynamic>.from(e);
+    return (user: UserModel.fromJson(m), email: m['email'] as String?);
+  }).toList();
 });
 
 class ManageAdminsScreen extends ConsumerWidget {
@@ -60,7 +68,8 @@ class ManageAdminsScreen extends ConsumerWidget {
             itemCount: list.length,
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, i) {
-              final a = list[i];
+              final a = list[i].user;
+              final email = list[i].email;
               final isMe = a.userId == me?.userId;
               return Card(
                 child: ListTile(
@@ -70,8 +79,9 @@ class ManageAdminsScreen extends ConsumerWidget {
                     child: Icon(Icons.admin_panel_settings_outlined),
                   ),
                   title: Text(isMe ? '${a.fullName} (You)' : a.fullName),
-                  subtitle: Text('${a.userId}\n${a.mobile}'),
+                  subtitle: Text('${a.userId}\n${a.mobile} · ${email ?? 'No email - tap to add'}'),
                   isThreeLine: true,
+                  onTap: () => _editEmail(context, ref, a, email),
                   trailing: isMe
                       ? null
                       : IconButton(
@@ -86,6 +96,44 @@ class ManageAdminsScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Email that receives the "Forgot Login PIN" code
+  Future<void> _editEmail(BuildContext context, WidgetRef ref, UserModel admin, String? current) async {
+    final controller = TextEditingController(text: current ?? '');
+    final email = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Email of ${admin.fullName}'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(
+            labelText: 'Email',
+            helperText: 'Forgot Login PIN codes are sent here',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (email == null || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    if (!isValidEmail(email)) {
+      messenger.showSnackBar(const SnackBar(content: Text('Enter a valid email'), backgroundColor: AppColors.errorRed));
+      return;
+    }
+    try {
+      await Supabase.instance.client.from(SupabaseConstants.tableUsers)
+          .update({'email': email.toLowerCase()}).eq('user_id', admin.userId);
+      ref.invalidate(allAdminsProvider);
+      messenger.showSnackBar(const SnackBar(content: Text('Email saved'), backgroundColor: AppColors.successGreen));
+    } catch (e) {
+      final msg = e is PostgrestException ? e.message : e.toString();
+      messenger.showSnackBar(SnackBar(content: Text('Could not save: $msg'), backgroundColor: AppColors.errorRed));
+    }
   }
 
   Future<void> _remove(BuildContext context, WidgetRef ref, UserModel admin) async {
@@ -126,12 +174,14 @@ class _AddAdminSheetState extends ConsumerState<_AddAdminSheet> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _mobile = TextEditingController();
+  final _email = TextEditingController();
   bool _saving = false;
 
   @override
   void dispose() {
     _name.dispose();
     _mobile.dispose();
+    _email.dispose();
     super.dispose();
   }
 
@@ -185,6 +235,7 @@ class _AddAdminSheetState extends ConsumerState<_AddAdminSheet> {
         'user_id': userId,
         'full_name': _name.text.trim(),
         'mobile': mobile,
+        'email': _email.text.trim().toLowerCase(),
         'role': 'admin',
         'company_code': me.companyCode,
         'mpin_hash': sha256.convert(utf8.encode(mpin)).toString(),
@@ -208,13 +259,13 @@ class _AddAdminSheetState extends ConsumerState<_AddAdminSheet> {
               const SizedBox(height: 16),
               SelectableText('User ID: $userId', style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              SelectableText('MPIN: $mpin', style: const TextStyle(fontWeight: FontWeight.bold)),
+              SelectableText('Login PIN: $mpin', style: const TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () {
-                Clipboard.setData(ClipboardData(text: 'User ID: $userId\nMPIN: $mpin'));
+                Clipboard.setData(ClipboardData(text: 'User ID: $userId\nLogin PIN: $mpin'));
                 ScaffoldMessenger.of(dialogContext).showSnackBar(const SnackBar(
                   content: Text('Credentials copied to clipboard'),
                   backgroundColor: AppColors.successGreen,
@@ -261,6 +312,16 @@ class _AddAdminSheetState extends ConsumerState<_AddAdminSheet> {
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: const InputDecoration(labelText: 'Mobile number'),
                 validator: (v) => (v == null || v.trim().length != 10) ? 'Enter a 10-digit mobile number' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _email,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  helperText: 'Forgot Login PIN codes are sent here',
+                ),
+                validator: (v) => isValidEmail(v ?? '') ? null : 'Enter a valid email',
               ),
               const SizedBox(height: 16),
               ElevatedButton(

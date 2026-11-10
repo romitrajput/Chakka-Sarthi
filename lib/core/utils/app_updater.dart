@@ -14,12 +14,31 @@ import 'package:sanjay_roadlines_fleet/core/constants/app_colors.dart';
 /// older build, it offers "Update", downloads the new APK and opens the installer.
 class AppUpdater {
   static const _bucket = 'app-releases';
-  static bool _checkedThisRun = false;
+  static bool _busy = false;
+  static BuildContext? _context;
+  static _ResumeWatcher? _watcher;
 
-  /// Call once from a dashboard. Silent if there is nothing new or no internet.
+  /// Installed version, e.g. "1.0.57" — shown in Settings
+  static Future<String> installedVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    return info.version;
+  }
+
+  /// Called by the dashboards each time they open. Checks now, and again whenever
+  /// the app is brought back after being in the background for 5 minutes or more.
   static Future<void> checkForUpdate(BuildContext context) async {
-    if (_checkedThisRun || !Platform.isAndroid) return;
-    _checkedThisRun = true;
+    _context = context;
+    if (_watcher == null) {
+      _watcher = _ResumeWatcher();
+      WidgetsBinding.instance.addObserver(_watcher!);
+    }
+    await _check();
+  }
+
+  static Future<void> _check() async {
+    final context = _context;
+    if (_busy || context == null || !context.mounted || !Platform.isAndroid) return;
+    _busy = true;
     try {
       final storage = Supabase.instance.client.storage.from(_bucket);
       final infoUrl = storage.getPublicUrl('latest.json');
@@ -30,17 +49,42 @@ class AppUpdater {
       final info = jsonDecode(res.data ?? '{}') as Map<String, dynamic>;
       final latestBuild = int.tryParse('${info['build']}') ?? 0;
       final apkName = info['apk'] as String?;
-      final mine = int.tryParse((await PackageInfo.fromPlatform()).buildNumber) ?? 0;
+      final pkg = await PackageInfo.fromPlatform();
+      final mine = int.tryParse(pkg.buildNumber) ?? 0;
       if (apkName == null || latestBuild <= mine) return;
       if (!context.mounted) return;
       final apkUrl = storage.getPublicUrl(apkName);
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => _UpdateDialog(apkUrl: apkUrl, build: latestBuild),
+        builder: (_) => _UpdateDialog(
+          apkUrl: apkUrl,
+          build: latestBuild,
+          installed: pkg.version,
+          latest: (info['version'] as String?) ?? '1.0.$latestBuild',
+        ),
       );
     } catch (_) {
       // No internet / nothing published yet — try again next time the app opens
+    } finally {
+      _busy = false;
+    }
+  }
+}
+
+class _ResumeWatcher with WidgetsBindingObserver {
+  DateTime? _wentAway;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _wentAway = DateTime.now();
+    } else if (state == AppLifecycleState.resumed) {
+      final away = _wentAway;
+      _wentAway = null;
+      if (away != null && DateTime.now().difference(away) >= const Duration(minutes: 5)) {
+        AppUpdater._check();
+      }
     }
   }
 }
@@ -48,7 +92,9 @@ class AppUpdater {
 class _UpdateDialog extends StatefulWidget {
   final String apkUrl;
   final int build;
-  const _UpdateDialog({required this.apkUrl, required this.build});
+  final String installed;
+  final String latest;
+  const _UpdateDialog({required this.apkUrl, required this.build, required this.installed, required this.latest});
 
   @override
   State<_UpdateDialog> createState() => _UpdateDialogState();
@@ -102,7 +148,8 @@ class _UpdateDialogState extends State<_UpdateDialog> {
         children: [
           Text(downloading
               ? 'Downloading… ${(_progress! * 100).toStringAsFixed(0)}%'
-              : 'A new version of Chakka Saarthi is ready. Tap Update to install it.'),
+              : 'A new version of Chakka Saarthi is ready. Tap Update to install it.\n\n'
+                  'Your version: ${widget.installed}\nNew version: ${widget.latest}'),
           if (downloading) ...[
             const SizedBox(height: 12),
             LinearProgressIndicator(value: _progress, color: AppColors.brandYellow),
