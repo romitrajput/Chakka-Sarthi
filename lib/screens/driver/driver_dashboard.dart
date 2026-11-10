@@ -1,3 +1,5 @@
+import 'package:supabase_flutter/supabase_flutter.dart' show Supabase;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:sanjay_roadlines_fleet/core/widgets/app_version_text.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/app_updater.dart';
 import 'package:flutter/material.dart';
@@ -372,6 +374,17 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
     );
   }
 
+  /// Hindi tutorial video, kept in the public "app-releases" storage folder
+  /// (tutorial-hi.mp4), so it can be replaced without a new app build.
+  Future<void> _openTutorial(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final url = Supabase.instance.client.storage.from('app-releases').getPublicUrl('tutorial-hi.mp4');
+    final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    if (!ok) {
+      messenger.showSnackBar(SnackBar(content: Text(_tr('tutorialNotAvailable')), backgroundColor: AppColors.errorRed));
+    }
+  }
+
   /// Settings: reset Login PIN, pop-up notifications on/off, log out.
   void _showDriverSettings(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
@@ -393,6 +406,16 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard>
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     child: Text(_tr('accountSettings'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                   ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.play_circle_outline, color: AppColors.primaryDark),
+                  title: Text(_tr('watchTutorial')),
+                  subtitle: Text(_tr('watchTutorialDesc'), style: const TextStyle(fontSize: 12)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _openTutorial(context);
+                  },
                 ),
                 ListTile(
                   leading: const Icon(Icons.lock_reset, color: AppColors.primaryDark),
