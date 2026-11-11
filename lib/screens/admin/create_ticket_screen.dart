@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -113,7 +114,12 @@ class _CreateTicketScreenState extends ConsumerState<CreateTicketScreen> {
         messenger.showSnackBar(
           const SnackBar(content: Text('Trip Assigned Successfully'), backgroundColor: AppColors.successGreen),
         );
-        router.pop();
+        // Opened from the website menu there is no screen to go back to
+        if (router.canPop()) {
+          router.pop();
+        } else {
+          router.go(kIsWeb ? '/admin/trips' : '/admin/dashboard');
+        }
       }
     } catch (e) {
       if (mounted) {

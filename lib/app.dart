@@ -1,3 +1,8 @@
+import 'package:sanjay_roadlines_fleet/web/desktop_shell.dart';
+import 'package:sanjay_roadlines_fleet/web/desktop_dashboard.dart';
+import 'package:sanjay_roadlines_fleet/web/desktop_trips_screen.dart';
+import 'package:sanjay_roadlines_fleet/web/desktop_notifications_screen.dart';
+import 'package:sanjay_roadlines_fleet/web/desktop_settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -67,11 +72,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/admin/dashboard',
-        builder: (context, state) => const AdminDashboard(),
+        builder: (context, state) => const ResponsiveSwitch(desktop: DesktopDashboard(), mobile: AdminDashboard()),
       ),
       GoRoute(
         path: '/admin/notifications',
-        builder: (context, state) => const NotificationsScreen(),
+        builder: (context, state) =>
+            const ResponsiveSwitch(desktop: DesktopNotificationsScreen(), mobile: NotificationsScreen()),
+      ),
+      // Website only (full-screen layout)
+      GoRoute(
+        path: '/admin/trips',
+        builder: (context, state) => const DesktopTripsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/settings',
+        builder: (context, state) => const DesktopSettingsScreen(),
       ),
       GoRoute(
         path: '/admin/create-ticket',
@@ -170,6 +185,9 @@ class _AppState extends ConsumerState<App> {
       title: AppStrings.appName,
       locale: currentLocale,
       theme: _chakkaSaarthiTheme(),
+      // Website: left menu + full-screen pages for admins on a wide window,
+      // phone-style centred column otherwise. Phones are not affected.
+      builder: (context, child) => DesktopFrame(child: child ?? const SizedBox.shrink()),
     );
   }
 }

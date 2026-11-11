@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'package:excel/excel.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:sanjay_roadlines_fleet/core/utils/file_share.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/detention.dart';
 
 /// Builds the vehicle-wise report as an Excel (.xlsx) file and opens the share sheet
@@ -109,13 +107,11 @@ class ExcelExporter {
     final bytes = excel.save();
     if (bytes == null) throw Exception('Could not create the Excel file');
 
-    final dir = await getTemporaryDirectory();
     final safeVehicle = vehicleNumber.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
-    final file = File('${dir.path}/Report_${safeVehicle}_${DateFormat('ddMMMyyyy').format(fromDate)}-${DateFormat('ddMMMyyyy').format(toDate)}.xlsx');
-    await file.writeAsBytes(bytes, flush: true);
-
-    await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+    await FileShare.shareBytes(
+      bytes,
+      fileName: 'Report_${safeVehicle}_${DateFormat('ddMMMyyyy').format(fromDate)}-${DateFormat('ddMMMyyyy').format(toDate)}.xlsx',
+      mimeType: FileShare.xlsxMime,
       subject: '$businessName – $vehicleNumber report',
       text: '$businessName – vehicle report for $vehicleNumber ($period)',
     );

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -14,7 +15,7 @@ class LocalNotificationService {
   static bool _isInitialized = false;
 
   static Future<void> initialize() async {
-    if (_isInitialized) return;
+    if (kIsWeb || _isInitialized) return; // no phone pop-ups in the web version
 
     const androidSettings = AndroidInitializationSettings('@drawable/ic_stat_notify');
     const iosSettings = DarwinInitializationSettings(
@@ -50,6 +51,7 @@ class LocalNotificationService {
     required String body,
     int id = 0,
   }) async {
+    if (kIsWeb) return;
     if (!_isInitialized) await initialize();
 
     const androidDetails = AndroidNotificationDetails(
@@ -107,6 +109,7 @@ class LocalNotificationService {
 
   /// Listen to real-time notifications from Supabase and show as pop-ups
   static void startListening(String targetUserId) {
+    if (kIsWeb) return;
     // Already listening for this user: don't restart (restarting re-sends the latest notification)
     if (_subscription != null && _listeningFor == targetUserId) return;
     _subscription?.cancel();
@@ -151,6 +154,7 @@ class LocalNotificationService {
 
   /// Initialize translation service for notifications
   static Future<void> initializeTranslation({required String targetLanguageCode}) async {
+    if (kIsWeb) return;
     final targetLang = SupportedLanguage.getLanguageFromCode(targetLanguageCode);
     if (targetLang != null) {
       _translationService = TranslationService();

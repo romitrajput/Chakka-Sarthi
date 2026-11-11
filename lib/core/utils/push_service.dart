@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -10,6 +11,7 @@ class PushService {
   static bool get isReady => _ready;
 
   static Future<void> init() async {
+    if (kIsWeb) return; // push alerts are for the phone app
     try {
       await Firebase.initializeApp();
       _ready = true;

@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'package:excel/excel.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:sanjay_roadlines_fleet/core/utils/file_share.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/supabase_constants.dart';
 
@@ -38,7 +36,7 @@ class BackupExporter {
   }
 
   /// Builds the backup file. Returns the file and a short summary like "8 sheets · 154 rows".
-  static Future<(File, String)> buildFullBackup({required String businessName}) async {
+  static Future<(BackupFile, String)> buildFullBackup({required String businessName}) async {
     final excel = Excel.createExcel();
     final bold = CellStyle(bold: true);
     int totalRows = 0;
@@ -90,18 +88,24 @@ class BackupExporter {
 
     final stamp = DateFormat('dd-MMM-yyyy_HHmm').format(DateTime.now());
     final safeName = businessName.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_');
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/Backup_${safeName}_$stamp.xlsx');
-    await file.writeAsBytes(bytes, flush: true);
+    final file = BackupFile(bytes, 'Backup_${safeName}_$stamp.xlsx');
     return (file, '${_sheets.length} sheets · $totalRows rows');
   }
 
-  /// Opens the share sheet (Drive, Gmail, WhatsApp, Files…) for the backup file.
-  static Future<void> share(File file, String businessName) async {
-    await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+  /// Phone: opens the share sheet (Drive, Gmail, WhatsApp, Files…). Web: downloads the file.
+  static Future<void> share(BackupFile file, String businessName) async {
+    await FileShare.shareBytes(
+      file.bytes,
+      fileName: file.name,
+      mimeType: FileShare.xlsxMime,
       subject: '$businessName – data backup',
       text: 'Chakka Saarthi data backup of $businessName',
     );
   }
+}
+
+class BackupFile {
+  final List<int> bytes;
+  final String name;
+  const BackupFile(this.bytes, this.name);
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -87,7 +88,15 @@ class AuthRepository {
         'p_mobile': mobile?.trim(),
         'p_mpin_hash': mpinHash,
       });
-      return UserModel.fromJson(Map<String, dynamic>.from(res as Map));
+      final user = UserModel.fromJson(Map<String, dynamic>.from(res as Map));
+      if (kIsWeb && user.role != 'admin') {
+        // The website is for admins; drivers use the phone app
+        try {
+          await _client.rpc('app_logout');
+        } catch (_) {}
+        throw Exception('The website is for admins only. Drivers, please use the Chakka Saarthi phone app.');
+      }
+      return user;
     } on PostgrestException catch (e) {
       throw Exception(e.message);
     }
@@ -139,7 +148,9 @@ class AuthRepository {
           .maybeSingle();
 
       if (response == null) return null;
-      return UserModel.fromJson(response);
+      final user = UserModel.fromJson(response);
+      if (kIsWeb && user.role != 'admin') return null; // website is for admins only
+      return user;
     } catch (e) {
       rethrow;
     }

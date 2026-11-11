@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:convert';
 import 'dart:io';
 
@@ -27,6 +28,7 @@ class AppUpdater {
   /// Called by the dashboards each time they open. Checks now, and again whenever
   /// the app is brought back after being in the background for 5 minutes or more.
   static Future<void> checkForUpdate(BuildContext context) async {
+    if (kIsWeb) return; // the website is always the latest version
     _context = context;
     if (_watcher == null) {
       _watcher = _ResumeWatcher();
@@ -37,7 +39,7 @@ class AppUpdater {
 
   static Future<void> _check() async {
     final context = _context;
-    if (_busy || context == null || !context.mounted || !Platform.isAndroid) return;
+    if (kIsWeb || _busy || context == null || !context.mounted || !Platform.isAndroid) return;
     _busy = true;
     try {
       final storage = Supabase.instance.client.storage.from(_bucket);
