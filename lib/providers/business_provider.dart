@@ -132,22 +132,17 @@ Future<String?> showBusinessNameDialog(
       canPop: !required,
       child: StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
+          scrollable: true,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Business details'),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
           content: Form(
             key: formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (required)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 12),
-                    child: Text(
-                      'Your business name is shown at the top of the app and on every PDF report. The business email receives Forgot Login PIN codes and data backups. You can change both later in Settings → Business details.',
-                      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                    ),
-                  ),
                 TextFormField(
                   controller: controller,
                   autofocus: true,
@@ -155,7 +150,7 @@ Future<String?> showBusinessNameDialog(
                   textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(
                     labelText: 'Business name',
-                    hintText: 'e.g. Shree Ganesh Transport',
+                    counterText: '',
                     border: OutlineInputBorder(),
                   ),
                   validator: (v) {
@@ -164,15 +159,14 @@ Future<String?> showBusinessNameDialog(
                     return null;
                   },
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 14),
                 TextFormField(
                   controller: codeController,
                   maxLength: 5,
                   textCapitalization: TextCapitalization.characters,
                   decoration: const InputDecoration(
                     labelText: 'Short code',
-                    hintText: 'e.g. SRL',
-                    helperText: 'Starts every new Trip ID and Driver ID',
+                    counterText: '',
                     border: OutlineInputBorder(),
                   ),
                   validator: (v) {
@@ -181,14 +175,12 @@ Future<String?> showBusinessNameDialog(
                     return null;
                   },
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 14),
                 TextFormField(
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
                     labelText: 'Business email',
-                    hintText: 'e.g. accounts@yourbusiness.com',
-                    helperText: 'Forgot Login PIN codes and backups are sent here',
                     border: OutlineInputBorder(),
                   ),
                   validator: (v) {
