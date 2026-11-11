@@ -8,8 +8,9 @@ import 'package:sanjay_roadlines_fleet/core/utils/app_updater.dart';
 import 'package:sanjay_roadlines_fleet/providers/auth_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/notification_provider.dart';
 
-/// The admin website switches to the full-screen layout from this browser width.
-const double kDesktopMinWidth = 1000;
+/// The admin website switches to the full-screen layout from this browser width
+/// (laptops, tablets in landscape, and "Desktop site" mode on a phone, which is 980 wide).
+const double kDesktopMinWidth = 900;
 
 bool isDesktopWeb(BuildContext context) =>
     kIsWeb && MediaQuery.sizeOf(context).width >= kDesktopMinWidth;
