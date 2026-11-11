@@ -1,3 +1,5 @@
+import 'package:sanjay_roadlines_fleet/providers/business_email_provider.dart';
+import 'package:sanjay_roadlines_fleet/core/utils/usage_log.dart';
 import 'package:sanjay_roadlines_fleet/core/widgets/app_version_text.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/app_updater.dart';
 import 'dart:math' as math;
@@ -51,8 +53,9 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
       ref.invalidate(businessNameProvider); // always show the latest saved name
       ref.invalidate(expiringLicencesProvider); // fresh licence alerts
       final name = await ref.read(businessNameProvider.future);
-      if (name == null && mounted) {
-        await showBusinessNameDialog(context, ref, required: true);
+      final details = await ref.read(businessEmailProvider.future);
+      if ((name == null || details.email == null) && mounted) {
+        await showBusinessNameDialog(context, ref, current: name, required: true);
       }
     } catch (_) {
       // Ignore: the admin can still tap "Tap to add business name" in the header
@@ -61,6 +64,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(businessEmailProvider); // keeps Settings → Business email up to date
     final user = ref.watch(authStateProvider).value;
     final currentLocale = ref.watch(languageProvider);
     if (!_checkedBusinessName && user != null) {
@@ -617,12 +621,14 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
               ),
               ListTile(
                 leading: const Icon(Icons.local_shipping_outlined, color: AppColors.primaryDark),
-                title: const Text('Business name'),
+                title: const Text('Business details'),
                 subtitle: Text(
-                  ref.read(businessNameProvider).value ?? 'Not set yet',
-                  maxLines: 1,
+                  '${ref.read(businessNameProvider).value ?? 'Name not set'}\n'
+                  '${ref.read(businessEmailProvider).value?.email ?? 'Business email not set'}',
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
+                isThreeLine: true,
                 trailing: const Icon(Icons.edit_outlined),
                 onTap: () async {
                   Navigator.pop(sheetContext);
@@ -634,7 +640,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                   if (saved != null && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Business name updated to "$saved"'),
+                        content: Text('Business details saved ("$saved")'),
                         backgroundColor: AppColors.successGreen,
                       ),
                     );
@@ -674,11 +680,31 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
               ListTile(
                 leading: const Icon(Icons.backup_outlined, color: AppColors.primaryDark),
                 title: const Text('Backup data'),
-                subtitle: const Text('Download everything as an Excel file'),
+                subtitle: const Text('Download / share everything as an Excel file'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _runBackup(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.forward_to_inbox_outlined, color: AppColors.primaryDark),
+                title: const Text('Email backup'),
+                subtitle: Text(_lastBackupText(ref.read(businessEmailProvider).value?.lastBackup)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  emailBackupNow(context, ref);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.support_agent, color: AppColors.primaryDark),
+                title: const Text('Support'),
+                subtitle: const Text(kSupportEmail),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  contactSupport(context, ref);
                 },
               ),
               const Divider(height: 16),
@@ -720,6 +746,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
       final (file, summary) = await BackupExporter.buildFullBackup(businessName: name);
       navigator.pop(); // close "preparing" before the share sheet opens
       dialogOpen = false;
+      UsageLog.track('backup_download');
       await BackupExporter.share(file, name);
       messenger.showSnackBar(SnackBar(
         content: Text('Backup ready ($summary). Save it somewhere safe, e.g. Google Drive.'),
@@ -810,4 +837,11 @@ class _DonutChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+/// "Zip sent to the business email · last: 12 Nov 2026, 3:00 AM"
+String _lastBackupText(DateTime? last) {
+  if (last == null) return 'Zip to the business email · weekly when data changes';
+  final d = '${last.day.toString().padLeft(2, '0')}/${last.month.toString().padLeft(2, '0')}/${last.year}';
+  return 'Zip to the business email · last sent $d';
 }

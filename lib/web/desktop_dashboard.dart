@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/app_colors.dart';
+import 'package:sanjay_roadlines_fleet/providers/business_email_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/driver_names_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/ticket_provider.dart';
@@ -31,10 +32,13 @@ class _DesktopDashboardState extends ConsumerState<DesktopDashboard> {
   Future<void> _askBusinessNameIfMissing() async {
     if (_askedName) return;
     _askedName = true;
-    final name = await ref.read(businessNameProvider.future).catchError((_) => null);
-    if (name == null && mounted) {
-      await showBusinessNameDialog(context, ref, required: true);
-    }
+    try {
+      final name = await ref.read(businessNameProvider.future);
+      final details = await ref.read(businessEmailProvider.future);
+      if ((name == null || details.email == null) && mounted) {
+        await showBusinessNameDialog(context, ref, current: name, required: true);
+      }
+    } catch (_) {}
   }
 
   void _refresh() {

@@ -1,8 +1,10 @@
+import 'package:sanjay_roadlines_fleet/core/utils/usage_log.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/app_colors.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/app_updater.dart';
 import 'package:sanjay_roadlines_fleet/core/utils/backup_exporter.dart';
+import 'package:sanjay_roadlines_fleet/providers/business_email_provider.dart';
 import 'package:sanjay_roadlines_fleet/providers/business_provider.dart';
 import 'package:sanjay_roadlines_fleet/web/desktop_shell.dart';
 
@@ -23,6 +25,7 @@ class _DesktopSettingsScreenState extends ConsumerState<DesktopSettingsScreen> {
     try {
       final name = await currentBusinessName(ref);
       final (file, summary) = await BackupExporter.buildFullBackup(businessName: name);
+      UsageLog.track('backup_download');
       await BackupExporter.share(file, name);
       messenger.showSnackBar(SnackBar(
         content: Text('Backup downloaded ($summary). Keep it somewhere safe, e.g. Google Drive.'),
@@ -37,6 +40,7 @@ class _DesktopSettingsScreenState extends ConsumerState<DesktopSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final business = ref.watch(businessNameProvider).value;
+    final mail = ref.watch(businessEmailProvider).value;
 
     Widget item(IconData icon, String title, String subtitle, Widget trailing) => Card(
           color: Colors.white,
@@ -76,8 +80,8 @@ class _DesktopSettingsScreenState extends ConsumerState<DesktopSettingsScreen> {
             children: [
               item(
                 Icons.local_shipping_outlined,
-                'Business name',
-                business ?? 'Not set yet',
+                'Business details',
+                '${business ?? 'Name not set'} · ${mail?.email ?? 'business email not set'}',
                 OutlinedButton(
                   onPressed: () => showBusinessNameDialog(context, ref, current: business),
                   child: const Text('Change'),
@@ -94,6 +98,27 @@ class _DesktopSettingsScreenState extends ConsumerState<DesktopSettingsScreen> {
                     foregroundColor: AppColors.ink,
                   ),
                   child: Text(_backingUp ? 'Preparing…' : 'Download backup'),
+                ),
+              ),
+              item(
+                Icons.forward_to_inbox_outlined,
+                'Email backup',
+                mail?.lastBackup == null
+                    ? 'Zip sent to the business email · also every Sunday when data changed'
+                    : 'Zip sent to the business email · last sent '
+                        '${mail!.lastBackup!.day.toString().padLeft(2, '0')}/${mail.lastBackup!.month.toString().padLeft(2, '0')}/${mail.lastBackup!.year}',
+                OutlinedButton(
+                  onPressed: () => emailBackupNow(context, ref),
+                  child: const Text('Email now'),
+                ),
+              ),
+              item(
+                Icons.support_agent,
+                'Support',
+                'Write to the Chakka Saarthi support team: $kSupportEmail',
+                OutlinedButton(
+                  onPressed: () => contactSupport(context, ref),
+                  child: const Text('Email support'),
                 ),
               ),
               item(

@@ -1,3 +1,4 @@
+import 'package:sanjay_roadlines_fleet/core/utils/usage_log.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
@@ -774,6 +775,7 @@ class _AddDriverSheetState extends ConsumerState<AddDriverSheet> {
         ref.invalidate(allDriversProvider);
       ref.invalidate(driverNamesProvider);
       ref.invalidate(expiringLicencesProvider);
+        UsageLog.track('driver_added');
         showDialog(
           context: context,
           barrierDismissible: false,

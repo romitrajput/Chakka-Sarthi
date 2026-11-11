@@ -1,3 +1,4 @@
+import 'package:sanjay_roadlines_fleet/core/utils/usage_log.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -443,6 +444,7 @@ class _AddVehicleSheetState extends ConsumerState<AddVehicleSheet> {
       await ref.read(vehicleStateProvider.notifier).addVehicle(vehicleNumber);
       if (mounted) {
         navigator.pop();
+        UsageLog.track('vehicle_added');
         messenger.showSnackBar(
           const SnackBar(content: Text('Vehicle added successfully'), backgroundColor: AppColors.successGreen),
         );

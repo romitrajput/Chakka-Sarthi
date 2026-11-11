@@ -1,3 +1,4 @@
+import 'package:sanjay_roadlines_fleet/core/utils/usage_log.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -335,6 +336,7 @@ class _TripDetailsDialogState extends ConsumerState<_TripDetailsDialog> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final t = widget.row.ticket;
+      UsageLog.track('trip_pdf');
       final bytes = await PdfGenerator.generateTripPdf(
         ticket: t,
         loading: loading,

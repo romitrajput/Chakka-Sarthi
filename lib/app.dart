@@ -3,6 +3,7 @@ import 'package:sanjay_roadlines_fleet/web/desktop_dashboard.dart';
 import 'package:sanjay_roadlines_fleet/web/desktop_trips_screen.dart';
 import 'package:sanjay_roadlines_fleet/web/desktop_notifications_screen.dart';
 import 'package:sanjay_roadlines_fleet/web/desktop_settings_screen.dart';
+import 'package:sanjay_roadlines_fleet/core/utils/usage_log.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -38,7 +39,7 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final routerProvider = Provider<GoRouter>((ref) {
   final listenable = _AuthStateListenable(ref);
   
-  return GoRouter(
+  final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/login',
     refreshListenable: listenable,
@@ -153,6 +154,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+  // Private usage log: which admin screens are opened
+  router.routerDelegate.addListener(() {
+    UsageLog.screen(router.routerDelegate.currentConfiguration.uri.path);
+  });
+  return router;
 });
 
 class App extends ConsumerStatefulWidget {
@@ -195,6 +201,7 @@ class _AppState extends ConsumerState<App> {
 class _AuthStateListenable extends ChangeNotifier {
   _AuthStateListenable(Ref ref) {
     ref.listen(authStateProvider, (previous, next) {
+      if (!next.isLoading) UsageLog.setRole(next.value?.role);
       if (previous?.value != next.value || previous?.isLoading != next.isLoading) {
         notifyListeners();
       }

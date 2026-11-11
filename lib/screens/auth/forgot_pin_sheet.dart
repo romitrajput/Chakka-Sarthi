@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/app_colors.dart';
+import 'package:sanjay_roadlines_fleet/providers/business_email_provider.dart' show kSupportEmail;
 import 'package:sanjay_roadlines_fleet/repositories/auth_repository.dart';
 
 /// Admin "Forgot Login PIN": User ID + mobile → code by email → new Login PIN.
@@ -55,6 +57,12 @@ class _ForgotPinSheetState extends State<ForgotPinSheet> {
           throw Exception('Enter your User ID and 10-digit mobile number');
         }
         _sentTo = await _repo.sendPinResetCode(_userId.text, _mobile.text);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Code Sent on Email ($_sentTo)'),
+            backgroundColor: AppColors.successGreen,
+          ));
+        }
       });
 
   Future<void> _save() => _run(() async {
@@ -105,8 +113,23 @@ class _ForgotPinSheetState extends State<ForgotPinSheet> {
             ),
             if (codeSent) ...[
               const SizedBox(height: 12),
-              Text('Code sent to $_sentTo. Check inbox and spam.',
-                  style: const TextStyle(color: AppColors.successGreen, fontWeight: FontWeight.w600)),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDDF2E7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.mark_email_read_outlined, color: AppColors.successGreen),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text('Code Sent on Email\n$_sentTo · check inbox and spam',
+                          style: const TextStyle(color: AppColors.successGreen, fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: _code,
@@ -136,7 +159,30 @@ class _ForgotPinSheetState extends State<ForgotPinSheet> {
             ],
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(color: AppColors.errorRed)),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDECEA),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_error!, style: const TextStyle(color: AppColors.errorRed, fontWeight: FontWeight.w500)),
+                    if (_error!.contains(kSupportEmail))
+                      TextButton.icon(
+                        onPressed: () => launchUrl(Uri(
+                          scheme: 'mailto',
+                          path: kSupportEmail,
+                          query: 'subject=${Uri.encodeComponent('Forgot Login PIN – help needed')}'
+                              '&body=${Uri.encodeComponent('User ID: ${_userId.text.trim()}\n\nProblem: $_error')}',
+                        )),
+                        icon: const Icon(Icons.support_agent),
+                        label: const Text('Email support'),
+                      ),
+                  ],
+                ),
+              ),
             ],
             const SizedBox(height: 16),
             ElevatedButton(

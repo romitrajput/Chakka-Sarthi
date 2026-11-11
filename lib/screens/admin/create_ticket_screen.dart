@@ -1,3 +1,4 @@
+import 'package:sanjay_roadlines_fleet/core/utils/usage_log.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -111,6 +112,7 @@ class _CreateTicketScreenState extends ConsumerState<CreateTicketScreen> {
       }
 
       if (mounted) {
+        UsageLog.track('trip_created');
         messenger.showSnackBar(
           const SnackBar(content: Text('Trip Assigned Successfully'), backgroundColor: AppColors.successGreen),
         );

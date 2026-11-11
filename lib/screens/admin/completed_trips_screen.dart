@@ -1,3 +1,4 @@
+import 'package:sanjay_roadlines_fleet/core/utils/usage_log.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -491,6 +492,7 @@ class _CompletedTripsScreenState extends ConsumerState<CompletedTripsScreen> {
         return;
       }
 
+      UsageLog.track('trip_pdf');
       final pdfBytes = await PdfGenerator.generateTripPdf(
         ticket: ticket,
         loading: loading,

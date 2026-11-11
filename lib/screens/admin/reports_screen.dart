@@ -1,3 +1,4 @@
+import 'package:sanjay_roadlines_fleet/core/utils/usage_log.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -805,6 +806,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
         }
         return;
       }
+      UsageLog.track('report_excel');
       await ExcelExporter.shareVehicleReport(
         businessName: await currentBusinessName(ref),
         vehicleNumber: _isAllVehicles ? 'All vehicles' : _selectedVehicleNumber!,
@@ -861,6 +863,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> with SingleTicker
         return;
       }
 
+      UsageLog.track('report_pdf');
       final pdfBytes = await PdfGenerator.generateConsolidatedReport(
         vehicleNumber: _isAllVehicles ? 'All vehicles' : _selectedVehicleNumber!,
         tripDetails: trips,

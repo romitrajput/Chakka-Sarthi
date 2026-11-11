@@ -1,3 +1,4 @@
+import 'package:sanjay_roadlines_fleet/core/utils/usage_log.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sanjay_roadlines_fleet/core/constants/app_colors.dart';
@@ -370,6 +371,7 @@ class _AdminAssignedTicketsScreenState
       ref.invalidate(allActiveTicketsProvider);
       ref.invalidate(assignedTicketsProvider);
 
+      UsageLog.track('trip_reassigned');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

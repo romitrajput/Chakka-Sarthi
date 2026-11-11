@@ -62,7 +62,8 @@ Future<String> currentBusinessName(WidgetRef ref) async {
 }
 
 /// Saves the business name for the admin's company and refreshes it everywhere.
-Future<void> saveBusinessName(WidgetRef ref, String companyCode, String name, {String? shortCode}) async {
+Future<void> saveBusinessName(WidgetRef ref, String companyCode, String name,
+    {String? shortCode, String? email}) async {
   final clean = name.trim();
   final code = shortCode?.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
   await Supabase.instance.client
@@ -70,11 +71,26 @@ Future<void> saveBusinessName(WidgetRef ref, String companyCode, String name, {S
       .update({
         'company_name': clean,
         if (code != null && code.isNotEmpty) 'short_name': code,
+        if (email != null && email.trim().isNotEmpty) 'business_email': email.trim().toLowerCase(),
       })
       .eq('company_code', companyCode);
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString(_businessNamePrefsKey, clean);
   ref.invalidate(businessNameProvider);
+  ref.read(businessDetailsVersion.notifier).state++;
+}
+
+/// Bumped whenever business details are saved, so screens showing the
+/// business email reload it.
+final businessDetailsVersion = StateProvider<int>((ref) => 0);
+
+/// A real, deliverable-looking email: no spaces, nothing like "cs.@gmail.com".
+bool isValidEmailAddress(String v) {
+  final e = v.trim();
+  final m = RegExp(r'^([A-Za-z0-9._%+-]+)@([A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})$').firstMatch(e);
+  if (m == null) return false;
+  final local = m.group(1)!;
+  return !local.startsWith('.') && !local.endsWith('.') && !local.contains('..');
 }
 
 /// Asks the admin for the business name and saves it.
@@ -92,15 +108,18 @@ Future<String?> showBusinessNameDialog(
   final controller = TextEditingController(text: current ?? '');
   // Short code used at the start of Trip IDs and Driver IDs (e.g. SRL)
   String currentCode = '';
+  String currentEmail = '';
   try {
     final row = await Supabase.instance.client
         .from(SupabaseConstants.tableCompanies)
-        .select('short_name')
+        .select('short_name, business_email')
         .eq('company_code', user.companyCode)
         .maybeSingle();
     currentCode = (row?['short_name'] as String?) ?? '';
+    currentEmail = (row?['business_email'] as String?) ?? '';
   } catch (_) {}
   final codeController = TextEditingController(text: currentCode);
+  final emailController = TextEditingController(text: currentEmail);
   final formKey = GlobalKey<FormState>();
   bool saving = false;
   String? error;
@@ -114,7 +133,7 @@ Future<String?> showBusinessNameDialog(
       child: StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(required ? 'What is your business called?' : 'Business name'),
+          title: const Text('Business details'),
           content: Form(
             key: formKey,
             child: Column(
@@ -125,7 +144,7 @@ Future<String?> showBusinessNameDialog(
                   const Padding(
                     padding: EdgeInsets.only(bottom: 12),
                     child: Text(
-                      'This name is shown at the top of the app for you and your drivers, and on every PDF report. You can change it later in Settings.',
+                      'Your business name is shown at the top of the app and on every PDF report. The business email receives Forgot Login PIN codes and data backups. You can change both later in Settings → Business details.',
                       style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                     ),
                   ),
@@ -135,6 +154,7 @@ Future<String?> showBusinessNameDialog(
                   maxLength: 60,
                   textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(
+                    labelText: 'Business name',
                     hintText: 'e.g. Shree Ganesh Transport',
                     border: OutlineInputBorder(),
                   ),
@@ -158,6 +178,22 @@ Future<String?> showBusinessNameDialog(
                   validator: (v) {
                     final c = (v ?? '').toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
                     if (c.length < 2) return 'Use 2–5 letters, e.g. SRL';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 4),
+                TextFormField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Business email',
+                    hintText: 'e.g. accounts@yourbusiness.com',
+                    helperText: 'Forgot Login PIN codes and backups are sent here',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) {
+                    if ((v ?? '').trim().isEmpty) return 'Business email is required';
+                    if (!isValidEmailAddress(v!)) return 'Enter a correct email, e.g. name@gmail.com';
                     return null;
                   },
                 ),
@@ -186,7 +222,7 @@ Future<String?> showBusinessNameDialog(
                       });
                       try {
                         await saveBusinessName(ref, user.companyCode, controller.text,
-                            shortCode: codeController.text);
+                            shortCode: codeController.text, email: emailController.text);
                         if (ctx.mounted) Navigator.pop(ctx, controller.text.trim());
                       } catch (e) {
                         setState(() {
