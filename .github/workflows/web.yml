@@ -1,0 +1,50 @@
+name: Build Website
+
+# Builds the admin website from the same app code and publishes it on Netlify.
+# Needs one repository secret: NETLIFY_AUTH_TOKEN (Netlify → User settings → Applications → New access token).
+on:
+  workflow_dispatch:
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SITE_NAME: chakka-saarthi-srl   # website address: https://chakka-saarthi-srl.netlify.app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter build web --release --build-number=${{ github.run_number }} --build-name=1.0.${{ github.run_number }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chakka-saarthi-website-${{ github.run_number }}
+          path: build/web
+      - name: Publish on Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ]; then
+            echo "::error::NETLIFY_AUTH_TOKEN secret is missing. Add it in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          API=https://api.netlify.com/api/v1
+          AUTH="Authorization: Bearer $NETLIFY_AUTH_TOKEN"
+          # Find the site, or create it the first time
+          SITE_ID=$(curl -fsS -H "$AUTH" "$API/sites?filter=all&name=$SITE_NAME" | jq -r --arg n "$SITE_NAME" '[.[] | select(.name == $n)][0].id // empty')
+          if [ -z "$SITE_ID" ]; then
+            SITE_ID=$(curl -fsS -X POST -H "$AUTH" -H "Content-Type: application/json" \
+              -d "{\"name\": \"$SITE_NAME\"}" "$API/sites" | jq -r '.id // empty')
+          fi
+          if [ -z "$SITE_ID" ]; then
+            echo "::error::Could not create the Netlify site '$SITE_NAME' (name may be taken). Change SITE_NAME at the top of this file."
+            exit 1
+          fi
+          (cd build/web && zip -qr ../../site.zip .)
+          DEPLOY=$(curl -fsS -X POST -H "$AUTH" -H "Content-Type: application/zip" --data-binary @site.zip "$API/sites/$SITE_ID/deploys")
+          echo "Deploy state: $(echo "$DEPLOY" | jq -r '.state')"
+          echo "Website: https://$SITE_NAME.netlify.app"
+          echo "### Website published: https://$SITE_NAME.netlify.app" >> "$GITHUB_STEP_SUMMARY"
+          
